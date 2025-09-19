@@ -1,44 +1,86 @@
-// Modern Mini Golf Pro - 2025 Enhanced JavaScript Application - Fixed Version
+// ========================================
+// SUPABASE CONFIGURATION
+// Replace these with your actual Supabase project details
+// ========================================
+const SUPABASE_URL = 'https://YOUR-PROJECT-ID.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Your anon/public key
 
+// Initialize Supabase client
+let supabase = null;
+let isSupabaseConfigured = false;
+
+// Check if Supabase is properly configured
+if (SUPABASE_URL.includes('YOUR-PROJECT-ID') || SUPABASE_ANON_KEY.includes('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...')) {
+    console.warn('⚠️ Supabase not configured. Using demo mode with localStorage fallback.');
+} else {
+    try {
+        supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        isSupabaseConfigured = true;
+        console.log('✅ Supabase initialized successfully');
+    } catch (error) {
+        console.error('❌ Failed to initialize Supabase:', error);
+    }
+}
+
+// ========================================
+// DATABASE SCHEMA SETUP (for reference)
+// Create this table in your Supabase database:
+// ========================================
+/*
+CREATE TABLE games (
+    id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    players JSONB NOT NULL,
+    scores JSONB NOT NULL DEFAULT '{}',
+    current_hole INTEGER DEFAULT 1,
+    total_holes INTEGER DEFAULT 18,
+    status TEXT DEFAULT 'in-progress',
+    start_time TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable Row Level Security
+ALTER TABLE games ENABLE ROW LEVEL SECURITY;
+
+-- Create policy for user data access
+CREATE POLICY "Users can access their own games" ON games
+    FOR ALL USING (auth.uid()::text = user_id);
+*/
+
+// Enhanced Mini Golf Pro with Supabase Integration
 document.addEventListener('DOMContentLoaded', function() {
     
     class MiniGolfPro {
         constructor() {
-            // Modern app configuration with calm colors
+            // Application configuration
             this.config = {
                 maxPlayers: 10,
-                totalHoles: 18,
-                // Calm, neutral player colors with high contrast for numbers
-                playerColors: [
-                    '#6B73FF', // Soft Blue
-                    '#10B981', // Sage Green
-                    '#64748B', // Warm Gray
-                    '#8B5CF6', // Lavender
-                    '#F59E0B', // Amber
-                    '#06B6D4', // Cyan
-                    '#EC4899', // Rose
-                    '#6B7280', // Light Gray
-                    '#475569', // Slate
-                    '#EF4444'  // Coral
+                playerColors: ["#FF4444", "#4444FF", "#44FF44", "#FFFF44", "#FF8844", "#8844FF", "#FF44FF", "#44FFFF", "#8B4513", "#888888"],
+                colorNames: ["Red", "Blue", "Green", "Yellow", "Orange", "Purple", "Pink", "Teal", "Brown", "Gray"],
+                countryCodes: [
+                    {code: "+1", country: "US/CA", flag: "🇺🇸"},
+                    {code: "+44", country: "UK", flag: "🇬🇧"},
+                    {code: "+49", country: "DE", flag: "🇩🇪"},
+                    {code: "+33", country: "FR", flag: "🇫🇷"},
+                    {code: "+39", country: "IT", flag: "🇮🇹"},
+                    {code: "+34", country: "ES", flag: "🇪🇸"},
+                    {code: "+31", country: "NL", flag: "🇳🇱"},
+                    {code: "+61", country: "AU", flag: "🇦🇺"}
                 ],
-                colorNames: [
-                    'Soft Blue', 'Sage Green', 'Warm Gray', 'Lavender', 
-                    'Amber', 'Cyan', 'Rose', 'Light Gray', 'Slate', 'Coral'
-                ],
-                quickScores: [1, 2, 3, 4, 5, 6],
-                scoreRange: { min: 1, max: 15 },
-                demoVerificationCode: '123456',
-                autoSaveInterval: 3000
+                quickScores: [1, 2, 3, 4, 5],
+                gameTemplates: ["Quick 9", "Full 18", "Tournament", "Practice"],
+                demoCode: "123456",
+                defaultHoles: 18
             };
             
-            // App state
+            // Application state
             this.currentUser = null;
             this.currentGame = null;
             this.savedGames = [];
             this.selectedGameId = null;
-            this.selectedPlayerIndex = null;
-            this.autoSaveTimer = null;
-            this.lastSaveTime = null;
+            this.activePlayerIndex = null;
             
             // Game state
             this.players = [];
@@ -46,212 +88,490 @@ document.addEventListener('DOMContentLoaded', function() {
             this.totalHoles = 18;
             this.scores = {};
             this.gameComplete = false;
+            this.gameStartTime = null;
             
             // UI state
-            this.currentFilter = 'all';
+            this.resendTimer = null;
+            this.resendCountdown = 30;
+            this.playerCount = 2;
+            this.isOnline = navigator.onLine;
             
             this.initialize();
         }
 
         initialize() {
+            this.setupOnlineDetection();
             this.loadUserData();
             this.setupEventListeners();
-            this.setupOTPInputs();
             this.checkUserSession();
-            this.startPeriodicUpdates();
+            this.setupToastContainer();
+            this.showConfigurationNoticeIfNeeded();
+        }
+
+        setupOnlineDetection() {
+            window.addEventListener('online', () => {
+                this.isOnline = true;
+                this.showToast('Back online! Data will sync.', 'success');
+                this.syncOfflineData();
+            });
             
-            // Fix: Ensure phone input is ready
-            setTimeout(() => {
-                this.initializePhoneInput();
-            }, 100);
-        }
-
-        // Fix: Initialize phone input properly
-        initializePhoneInput() {
-            const phoneInput = document.getElementById('phone-input');
-            if (phoneInput) {
-                phoneInput.removeAttribute('disabled');
-                phoneInput.removeAttribute('readonly');
-                phoneInput.style.pointerEvents = 'auto';
-                phoneInput.tabIndex = 1;
-                
-                // Clear any existing value and focus
-                phoneInput.value = '';
-                phoneInput.focus();
-            }
-        }
-
-        // Enhanced Backend Simulation
-        async simulateApiCall(endpoint, data = null, duration = 1000) {
-            this.showLoading(`Processing ${endpoint}...`);
-            return new Promise(resolve => {
-                setTimeout(() => {
-                    this.hideLoading();
-                    resolve(this.mockApiResponse(endpoint, data));
-                }, duration);
+            window.addEventListener('offline', () => {
+                this.isOnline = false;
+                this.showToast('You\'re offline. Changes saved locally.', 'warning');
             });
         }
 
-        mockApiResponse(endpoint, data) {
-            switch (endpoint) {
-                case 'auth.signInWithOtp':
-                    return { success: true, message: `OTP sent to ${data.phone}` };
-                case 'auth.verifyOtp':
-                    if (data.token === this.config.demoVerificationCode) {
-                        const user = {
-                            id: Date.now().toString(),
-                            phone: data.phone,
-                            display_name: `Player ${Date.now().toString().slice(-4)}`,
-                            created_at: new Date().toISOString()
-                        };
-                        return { success: true, user, session: { access_token: 'mock_token' } };
-                    }
-                    return { success: false, error: { message: 'Invalid verification code. Try 123456' } };
-                case 'games.insert':
-                case 'games.upsert':
-                    return { success: true, data: { ...data, id: data.id || Date.now().toString() } };
-                case 'games.delete':
-                    return { success: true };
-                default:
-                    return { success: true, data: data };
+        showConfigurationNoticeIfNeeded() {
+            if (!isSupabaseConfigured) {
+                // Show configuration notice after a delay
+                setTimeout(() => {
+                    const modal = document.getElementById('config-notice');
+                    if (modal) modal.classList.remove('hidden');
+                }, 2000);
             }
         }
 
-        async sendVerificationCode(phone) {
-            const response = await this.simulateApiCall('auth.signInWithOtp', { phone }, 1500);
-            if (response.success) {
-                this.showToast('Verification code sent!', 'success');
+        // ===== SUPABASE AUTHENTICATION =====
+        async sendSMSCode(phoneNumber) {
+            if (!isSupabaseConfigured) {
+                // Demo mode - simulate API call
+                await new Promise(resolve => setTimeout(resolve, 1500));
+                return { success: true };
             }
-            return response;
-        }
 
-        async verifyCode(phone, code) {
-            const response = await this.simulateApiCall('auth.verifyOtp', { phone, token: code }, 1000);
-            if (response.success) {
-                this.currentUser = response.user;
-                this.saveUserData();
-                this.showToast('Welcome to Mini Golf Pro!', 'success');
-            }
-            return response;
-        }
+            try {
+                const { error } = await supabase.auth.signInWithOtp({
+                    phone: phoneNumber.replace(/\s/g, ''), // Remove spaces
+                });
 
-        async saveGame(gameData) {
-            const response = await this.simulateApiCall('games.upsert', gameData, 500);
-            if (response.success) {
-                const savedGame = response.data;
-                savedGame.updated_at = new Date().toISOString();
-                
-                const index = this.savedGames.findIndex(g => g.id === savedGame.id);
-                if (index !== -1) {
-                    this.savedGames[index] = savedGame;
-                } else {
-                    savedGame.created_at = savedGame.created_at || new Date().toISOString();
-                    this.savedGames.unshift(savedGame);
+                if (error) {
+                    console.error('SMS send error:', error);
+                    return { success: false, message: error.message };
                 }
-                this.saveUserData();
-                this.updateAutoSaveIndicator();
-                this.lastSaveTime = Date.now();
+
+                return { success: true };
+            } catch (error) {
+                console.error('SMS send error:', error);
+                return { success: false, message: 'Failed to send SMS. Please try again.' };
             }
-            return response;
+        }
+
+        async verifySMSCode(phoneNumber, code) {
+            if (!isSupabaseConfigured) {
+                // Demo mode - simulate API call
+                await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                if (code === this.config.demoCode) {
+                    const user = {
+                        id: 'demo-user-' + Date.now(),
+                        phone: phoneNumber,
+                        createdAt: new Date().toISOString(),
+                        initials: this.generateInitials(phoneNumber)
+                    };
+                    
+                    this.currentUser = user;
+                    this.saveUserData();
+                    return { success: true, user };
+                } else {
+                    return { success: false, message: 'Invalid verification code. Use 123456 for demo.' };
+                }
+            }
+
+            try {
+                const { data, error } = await supabase.auth.verifyOtp({
+                    phone: phoneNumber.replace(/\s/g, ''),
+                    token: code,
+                    type: 'sms'
+                });
+
+                if (error) {
+                    console.error('SMS verification error:', error);
+                    return { success: false, message: error.message };
+                }
+
+                if (data?.user) {
+                    const user = {
+                        id: data.user.id,
+                        phone: data.user.phone || phoneNumber,
+                        createdAt: data.user.created_at,
+                        initials: this.generateInitials(phoneNumber)
+                    };
+                    
+                    this.currentUser = user;
+                    await this.saveUserData();
+                    return { success: true, user };
+                }
+
+                return { success: false, message: 'Verification failed' };
+            } catch (error) {
+                console.error('SMS verification error:', error);
+                return { success: false, message: 'Verification failed. Please try again.' };
+            }
+        }
+
+        async checkUserSession() {
+            if (!isSupabaseConfigured) {
+                // Demo mode - check localStorage
+                if (this.currentUser) {
+                    this.showDashboard();
+                } else {
+                    this.showLoginScreen();
+                }
+                return;
+            }
+
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+                
+                if (session?.user) {
+                    this.currentUser = {
+                        id: session.user.id,
+                        phone: session.user.phone || session.user.email || 'Unknown',
+                        createdAt: session.user.created_at,
+                        initials: this.generateInitials(session.user.phone || session.user.email)
+                    };
+                    
+                    await this.loadSavedGames();
+                    this.showDashboard();
+                } else {
+                    this.showLoginScreen();
+                }
+                
+                // Listen for auth state changes
+                supabase.auth.onAuthStateChange((event, session) => {
+                    console.log('Auth state changed:', event);
+                    
+                    if (event === 'SIGNED_IN' && session?.user) {
+                        this.currentUser = {
+                            id: session.user.id,
+                            phone: session.user.phone || session.user.email || 'Unknown',
+                            createdAt: session.user.created_at,
+                            initials: this.generateInitials(session.user.phone || session.user.email)
+                        };
+                        
+                        this.loadSavedGames().then(() => {
+                            this.showDashboard();
+                        });
+                    } else if (event === 'SIGNED_OUT') {
+                        this.currentUser = null;
+                        this.savedGames = [];
+                        this.showLoginScreen();
+                    }
+                });
+                
+            } catch (error) {
+                console.error('Session check error:', error);
+                this.showLoginScreen();
+            }
+        }
+
+        // ===== SUPABASE DATABASE OPERATIONS =====
+        async saveGame(gameData) {
+            const isNewGame = !gameData.id;
+            
+            if (!isSupabaseConfigured || !this.isOnline) {
+                // Fallback to localStorage
+                return this.saveGameToLocalStorage(gameData);
+            }
+
+            try {
+                const gameToSave = {
+                    user_id: this.currentUser.id,
+                    name: gameData.name,
+                    players: gameData.players,
+                    scores: gameData.scores,
+                    current_hole: gameData.currentHole,
+                    total_holes: gameData.totalHoles,
+                    status: gameData.status,
+                    start_time: gameData.startTime || new Date().toISOString()
+                };
+
+                let result;
+                if (isNewGame) {
+                    const { data, error } = await supabase
+                        .from('games')
+                        .insert([gameToSave])
+                        .select()
+                        .single();
+                    
+                    if (error) throw error;
+                    result = data;
+                } else {
+                    const { data, error } = await supabase
+                        .from('games')
+                        .update({
+                            ...gameToSave,
+                            updated_at: new Date().toISOString()
+                        })
+                        .eq('id', gameData.id)
+                        .select()
+                        .single();
+                    
+                    if (error) throw error;
+                    result = data;
+                }
+
+                // Update local state
+                const savedGame = {
+                    id: result.id,
+                    userId: result.user_id,
+                    name: result.name,
+                    players: result.players,
+                    scores: result.scores,
+                    currentHole: result.current_hole,
+                    totalHoles: result.total_holes,
+                    status: result.status,
+                    startTime: result.start_time,
+                    createdAt: result.created_at,
+                    updatedAt: result.updated_at
+                };
+
+                if (isNewGame) {
+                    this.savedGames.unshift(savedGame);
+                    this.showToast('Game saved successfully!', 'success');
+                } else {
+                    const index = this.savedGames.findIndex(g => g.id === savedGame.id);
+                    if (index !== -1) {
+                        this.savedGames[index] = savedGame;
+                    }
+                }
+
+                // Also save to localStorage as backup
+                this.saveUserDataToLocalStorage();
+
+                return { success: true, game: savedGame };
+            } catch (error) {
+                console.error('Save game error:', error);
+                
+                // Fallback to localStorage
+                this.showToast('Saved locally (will sync when online)', 'warning');
+                return this.saveGameToLocalStorage(gameData);
+            }
+        }
+
+        async loadSavedGames() {
+            if (!isSupabaseConfigured || !this.isOnline) {
+                // Load from localStorage
+                this.loadUserDataFromLocalStorage();
+                return;
+            }
+
+            try {
+                const { data, error } = await supabase
+                    .from('games')
+                    .select('*')
+                    .eq('user_id', this.currentUser.id)
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                this.savedGames = data.map(game => ({
+                    id: game.id,
+                    userId: game.user_id,
+                    name: game.name,
+                    players: game.players,
+                    scores: game.scores,
+                    currentHole: game.current_hole,
+                    totalHoles: game.total_holes,
+                    status: game.status,
+                    startTime: game.start_time,
+                    createdAt: game.created_at,
+                    updatedAt: game.updated_at
+                }));
+
+                // Also save to localStorage as backup
+                this.saveUserDataToLocalStorage();
+
+            } catch (error) {
+                console.error('Load games error:', error);
+                this.showToast('Using offline data', 'warning');
+                this.loadUserDataFromLocalStorage();
+            }
         }
 
         async deleteGame(gameId) {
-            const response = await this.simulateApiCall('games.delete', { id: gameId }, 500);
-            if (response.success) {
+            if (!isSupabaseConfigured || !this.isOnline) {
+                // Delete from localStorage
                 this.savedGames = this.savedGames.filter(g => g.id !== gameId);
-                this.saveUserData();
-                this.showToast('Game deleted successfully', 'success');
+                this.saveUserDataToLocalStorage();
+                this.showToast('Game deleted', 'success');
+                return { success: true };
             }
-            return response;
+
+            try {
+                const { error } = await supabase
+                    .from('games')
+                    .delete()
+                    .eq('id', gameId)
+                    .eq('user_id', this.currentUser.id);
+
+                if (error) throw error;
+
+                // Remove from local state
+                this.savedGames = this.savedGames.filter(g => g.id !== gameId);
+                this.saveUserDataToLocalStorage();
+                this.showToast('Game deleted', 'success');
+                return { success: true };
+
+            } catch (error) {
+                console.error('Delete game error:', error);
+                this.showToast('Delete failed - try again when online', 'error');
+                return { success: false };
+            }
         }
 
-        // Enhanced Local Storage
-        saveUserData() {
+        // ===== FALLBACK LOCAL STORAGE METHODS =====
+        saveGameToLocalStorage(gameData) {
+            const isNewGame = !gameData.id;
+            
+            if (isNewGame) {
+                gameData.id = 'local-' + Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+                gameData.createdAt = new Date().toISOString();
+                this.savedGames.unshift(gameData);
+            } else {
+                const index = this.savedGames.findIndex(g => g.id === gameData.id);
+                if (index !== -1) {
+                    this.savedGames[index] = { ...gameData, updatedAt: new Date().toISOString() };
+                }
+            }
+            
+            this.saveUserDataToLocalStorage();
+            
+            if (isNewGame) {
+                this.showToast('Game saved locally!', 'success');
+            }
+            
+            return { success: true, game: gameData };
+        }
+
+        saveUserDataToLocalStorage() {
             const userData = {
                 currentUser: this.currentUser,
                 savedGames: this.savedGames,
-                lastSync: new Date().toISOString()
+                timestamp: Date.now()
             };
             try {
-                window.miniGolfProData = userData;
-                console.log('Data saved locally (would sync to Supabase in production)');
+                localStorage.setItem('miniGolfProData', JSON.stringify(userData));
             } catch (error) {
-                console.error('Failed to save user data:', error);
+                console.warn('Could not save to localStorage');
             }
         }
 
-        loadUserData() {
+        loadUserDataFromLocalStorage() {
             try {
-                const userData = window.miniGolfProData || {};
-                this.currentUser = userData.currentUser || null;
-                this.savedGames = userData.savedGames || [];
+                const savedData = localStorage.getItem('miniGolfProData');
+                if (savedData) {
+                    const userData = JSON.parse(savedData);
+                    this.savedGames = userData.savedGames || [];
+                }
             } catch (error) {
-                console.error('Failed to load user data:', error);
-                this.currentUser = null;
+                console.warn('Could not load from localStorage');
                 this.savedGames = [];
             }
         }
 
-        checkUserSession() {
-            if (this.currentUser) {
-                this.showDashboard();
+        // Legacy method for backward compatibility
+        saveUserData() {
+            this.saveUserDataToLocalStorage();
+        }
+
+        loadUserData() {
+            this.loadUserDataFromLocalStorage();
+        }
+
+        async syncOfflineData() {
+            if (!isSupabaseConfigured || !this.isOnline) return;
+
+            // Find games that were created/modified offline
+            const localGames = this.savedGames.filter(game => 
+                game.id.startsWith('local-') || !game.synced
+            );
+
+            for (const game of localGames) {
+                try {
+                    const result = await this.saveGame(game);
+                    if (result.success) {
+                        // Update the local ID with the server ID
+                        const index = this.savedGames.findIndex(g => g.id === game.id);
+                        if (index !== -1) {
+                            this.savedGames[index] = { ...result.game, synced: true };
+                        }
+                    }
+                } catch (error) {
+                    console.error('Sync error for game:', game.id, error);
+                }
+            }
+
+            // Refresh games from server
+            await this.loadSavedGames();
+            this.renderGames();
+        }
+
+        generateInitials(identifier) {
+            if (!identifier) return 'U';
+            const cleaned = identifier.replace(/\D/g, '');
+            return cleaned.slice(-2) || identifier.substring(0, 2).toUpperCase();
+        }
+
+        formatPhoneNumber(value, countryCode) {
+            const numbers = value.replace(/\D/g, '');
+            if (countryCode === '+1') {
+                // US format: (555) 123-4567
+                if (numbers.length >= 6) {
+                    return `(${numbers.slice(0, 3)}) ${numbers.slice(3, 6)}-${numbers.slice(6, 10)}`;
+                } else if (numbers.length >= 3) {
+                    return `(${numbers.slice(0, 3)}) ${numbers.slice(3)}`;
+                }
+                return numbers;
+            }
+            return numbers;
+        }
+
+        // ===== BUTTON STATE MANAGEMENT =====
+        setButtonLoading(buttonId, loading) {
+            const button = document.getElementById(buttonId);
+            if (!button) return;
+            
+            const btnText = button.querySelector('.btn-text');
+            const btnLoading = button.querySelector('.btn-loading');
+            
+            if (loading) {
+                button.disabled = true;
+                if (btnText) btnText.style.display = 'none';
+                if (btnLoading) btnLoading.classList.remove('hidden');
             } else {
-                this.showLogin();
+                button.disabled = false;
+                if (btnText) btnText.style.display = 'inline';
+                if (btnLoading) btnLoading.classList.add('hidden');
             }
         }
 
-        // Enhanced UI Helpers
-        showLoading(message = 'Loading...') {
-            const overlay = document.getElementById('loading-overlay');
-            const text = overlay?.querySelector('.loading-text');
-            if (overlay) {
-                overlay.classList.remove('hidden');
-                if (text) text.textContent = message;
-            }
-        }
-
-        hideLoading() {
-            const overlay = document.getElementById('loading-overlay');
-            if (overlay) overlay.classList.add('hidden');
-        }
-
-        showToast(message, type = 'success') {
-            const container = document.getElementById('toast-container');
-            if (!container) return;
-
-            const toast = document.createElement('div');
-            toast.className = `toast ${type}`;
-            toast.textContent = message;
-            
-            container.appendChild(toast);
-            
-            setTimeout(() => {
-                if (toast.parentNode) {
-                    toast.remove();
-                }
-            }, 3000);
-        }
-
-        showMessage(elementId, message, type = 'success') {
-            const messageEl = document.getElementById(elementId);
-            if (messageEl) {
-                messageEl.textContent = message;
-                messageEl.className = `message ${type}`;
-                messageEl.classList.remove('hidden');
+        duplicateGame(gameId) {
+            const game = this.savedGames.find(g => g.id === gameId);
+            if (game) {
+                const duplicatedGame = {
+                    ...game,
+                    id: null, // Will be assigned in saveGame
+                    name: `${game.name} (Copy)`,
+                    status: 'in-progress',
+                    currentHole: 1,
+                    scores: {},
+                    startTime: new Date().toISOString()
+                };
                 
-                if (type === 'success') {
-                    setTimeout(() => {
-                        messageEl.classList.add('hidden');
-                    }, 3000);
-                }
+                // Reset all scores
+                game.players.forEach((_, index) => {
+                    duplicatedGame.scores[index] = {};
+                });
+                
+                this.saveGame(duplicatedGame).then(() => {
+                    this.renderGames();
+                    this.showToast('Game duplicated successfully!', 'success');
+                });
             }
         }
 
-        hideMessage(elementId) {
-            const messageEl = document.getElementById(elementId);
-            if (messageEl) messageEl.classList.add('hidden');
-        }
-
+        // ===== SCREEN MANAGEMENT =====
         switchScreen(screenId) {
             const screens = document.querySelectorAll('.screen');
             screens.forEach(screen => screen.classList.remove('active'));
@@ -262,862 +582,445 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Enhanced OTP Setup
-        setupOTPInputs() {
-            const otpInputs = document.querySelectorAll('.otp-digit');
-            otpInputs.forEach((input, index) => {
-                input.addEventListener('input', (e) => this.handleOTPInput(e, index));
-                input.addEventListener('keydown', (e) => this.handleOTPKeydown(e, index));
-                input.addEventListener('paste', (e) => this.handleOTPPaste(e));
-            });
-        }
-
-        handleOTPInput(e, index) {
-            const value = e.target.value.replace(/[^0-9]/g, '');
-            e.target.value = value;
-            
-            if (value) {
-                e.target.classList.add('filled');
-                if (index < 5) {
-                    const nextInput = document.querySelector(`.otp-digit[data-index="${index + 1}"]`);
-                    if (nextInput) nextInput.focus();
-                }
-            } else {
-                e.target.classList.remove('filled');
-            }
-            
-            const allInputs = document.querySelectorAll('.otp-digit');
-            const allFilled = Array.from(allInputs).every(input => input.value);
-            if (allFilled) {
-                setTimeout(() => this.handleVerifyCode(), 500);
-            }
-        }
-
-        handleOTPKeydown(e, index) {
-            if (e.key === 'Backspace' && !e.target.value && index > 0) {
-                const prevInput = document.querySelector(`.otp-digit[data-index="${index - 1}"]`);
-                if (prevInput) {
-                    prevInput.focus();
-                    prevInput.value = '';
-                    prevInput.classList.remove('filled');
-                }
-            }
-        }
-
-        handleOTPPaste(e) {
-            e.preventDefault();
-            const paste = e.clipboardData.getData('text').replace(/[^0-9]/g, '').slice(0, 6);
-            const inputs = document.querySelectorAll('.otp-digit');
-            
-            paste.split('').forEach((digit, index) => {
-                if (inputs[index]) {
-                    inputs[index].value = digit;
-                    inputs[index].classList.add('filled');
-                }
-            });
-            
-            if (paste.length === 6) {
-                setTimeout(() => this.handleVerifyCode(), 500);
-            }
-        }
-
-        // Comprehensive Event Listeners
-        setupEventListeners() {
-            this.setupAuthEventListeners();
-            this.setupDashboardEventListeners();
-            this.setupGameEventListeners();
-            this.setupModalEventListeners();
-        }
-
-        setupAuthEventListeners() {
-            const sendCodeBtn = document.getElementById('send-code-btn');
-            const verifyCodeBtn = document.getElementById('verify-code-btn');
-            const backToLoginBtn = document.getElementById('back-to-login');
-            const logoutBtn = document.getElementById('logout-btn');
-            const resendCodeBtn = document.getElementById('resend-code');
-
-            if (sendCodeBtn) {
-                sendCodeBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.handleSendCode();
-                });
-            }
-
-            if (verifyCodeBtn) {
-                verifyCodeBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.handleVerifyCode();
-                });
-            }
-
-            if (backToLoginBtn) {
-                backToLoginBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.showLogin();
-                });
-            }
-
-            if (logoutBtn) {
-                logoutBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.handleLogout();
-                });
-            }
-
-            if (resendCodeBtn) {
-                resendCodeBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.handleSendCode();
-                });
-            }
-
-            // Fix: Proper phone input event handling
-            const phoneInput = document.getElementById('phone-input');
-            if (phoneInput) {
-                phoneInput.addEventListener('keypress', (e) => {
-                    if (e.key === 'Enter') {
-                        e.preventDefault();
-                        this.handleSendCode();
-                    }
-                });
-                
-                // Allow only numbers, spaces, dashes, and parentheses
-                phoneInput.addEventListener('input', (e) => {
-                    const value = e.target.value;
-                    const cleaned = value.replace(/[^\d\s\-\(\)]/g, '');
-                    if (value !== cleaned) {
-                        e.target.value = cleaned;
-                    }
-                });
-            }
-        }
-
-        setupDashboardEventListeners() {
-            const newGameBtn = document.getElementById('new-game-btn');
-            const backToDashboard = document.getElementById('back-to-dashboard');
-            const filterBtns = document.querySelectorAll('.filter-btn');
-
-            if (newGameBtn) {
-                newGameBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.showPlayerSetup();
-                });
-            }
-
-            if (backToDashboard) {
-                backToDashboard.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.showDashboard();
-                });
-            }
-
-            filterBtns.forEach(btn => {
-                btn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.setGameFilter(btn.dataset.filter);
-                });
-            });
-        }
-
-        setupGameEventListeners() {
-            const playerCountSelect = document.getElementById('player-count');
-            const totalHolesSelect = document.getElementById('total-holes');
-            const startGameBtn = document.getElementById('start-game');
-
-            if (playerCountSelect) {
-                playerCountSelect.addEventListener('change', () => this.generatePlayerInputs());
-            }
-            
-            if (totalHolesSelect) {
-                totalHolesSelect.addEventListener('change', (e) => {
-                    this.totalHoles = parseInt(e.target.value);
-                });
-            }
-            
-            if (startGameBtn) {
-                startGameBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.startGame();
-                });
-            }
-
-            // Game screen events
-            const saveExitBtn = document.getElementById('save-exit-btn');
-            const scoreTab = document.getElementById('score-tab');
-            const leaderboardTab = document.getElementById('leaderboard-tab');
-            
-            // Fix: All navigation button variants
-            const prevHoleBtn = document.getElementById('prev-hole');
-            const nextHoleBtn = document.getElementById('next-hole');
-            const prevHoleTopBtn = document.getElementById('prev-hole-top');
-            const nextHoleTopBtn = document.getElementById('next-hole-top');
-
-            if (saveExitBtn) {
-                saveExitBtn.addEventListener('click', (e) => {
-                    e.preventDefault();
-                    this.saveAndExit();
-                });
-            }
-
-            if (scoreTab) {
-                scoreTab.addEventListener('click', () => this.showScoreTab());
-            }
-
-            if (leaderboardTab) {
-                leaderboardTab.addEventListener('click', () => this.showLeaderboardTab());
-            }
-
-            // Fix: Ensure all navigation buttons work
-            if (prevHoleBtn) {
-                prevHoleBtn.addEventListener('click', () => this.previousHole());
-            }
-            if (nextHoleBtn) {
-                nextHoleBtn.addEventListener('click', () => this.nextHole());
-            }
-            if (prevHoleTopBtn) {
-                prevHoleTopBtn.addEventListener('click', () => this.previousHole());
-            }
-            if (nextHoleTopBtn) {
-                nextHoleTopBtn.addEventListener('click', () => this.nextHole());
-            }
-
-            // Quick score and scorecard
-            document.addEventListener('click', (e) => {
-                if (e.target.classList.contains('quick-btn')) {
-                    const score = parseInt(e.target.dataset.score);
-                    if (this.selectedPlayerIndex !== null) {
-                        this.setQuickScore(this.selectedPlayerIndex, score);
-                    }
-                }
-            });
-
-            const viewScorecardBtn = document.getElementById('view-scorecard-btn');
-            if (viewScorecardBtn) {
-                viewScorecardBtn.addEventListener('click', () => this.showScorecard());
-            }
-        }
-
-        setupModalEventListeners() {
-            // Game complete modal
-            const saveCompletedBtn = document.getElementById('save-completed-game');
-            const newGameModalBtn = document.getElementById('new-game-modal');
-            const viewScorecardBtn = document.getElementById('view-scorecard');
-            const shareGameBtn = document.getElementById('share-game');
-
-            if (saveCompletedBtn) {
-                saveCompletedBtn.addEventListener('click', () => this.saveCompletedGame());
-            }
-            if (newGameModalBtn) {
-                newGameModalBtn.addEventListener('click', () => this.newGame());
-            }
-            if (viewScorecardBtn) {
-                viewScorecardBtn.addEventListener('click', () => this.showScorecard());
-            }
-            if (shareGameBtn) {
-                shareGameBtn.addEventListener('click', () => this.shareGame());
-            }
-
-            // Scorecard modal
-            const closeScorecardBtn = document.getElementById('close-scorecard');
-            const exportPdfBtn = document.getElementById('export-pdf');
-            const shareScorecardBtn = document.getElementById('share-scorecard');
-
-            if (closeScorecardBtn) {
-                closeScorecardBtn.addEventListener('click', () => this.hideScorecard());
-            }
-            if (exportPdfBtn) {
-                exportPdfBtn.addEventListener('click', () => this.exportPDF());
-            }
-            if (shareScorecardBtn) {
-                shareScorecardBtn.addEventListener('click', () => this.shareScorecard());
-            }
-
-            // Game actions modal
-            const closeGameActionsBtn = document.getElementById('close-game-actions');
-            const continueGameBtn = document.getElementById('continue-game');
-            const editGameBtn = document.getElementById('edit-game');
-            const duplicateGameBtn = document.getElementById('duplicate-game');
-            const deleteGameBtn = document.getElementById('delete-game');
-
-            if (closeGameActionsBtn) {
-                closeGameActionsBtn.addEventListener('click', () => this.hideGameActions());
-            }
-            if (continueGameBtn) {
-                continueGameBtn.addEventListener('click', () => this.continueGame());
-            }
-            if (editGameBtn) {
-                editGameBtn.addEventListener('click', () => this.editGame());
-            }
-            if (duplicateGameBtn) {
-                duplicateGameBtn.addEventListener('click', () => this.duplicateGame());
-            }
-            if (deleteGameBtn) {
-                deleteGameBtn.addEventListener('click', () => this.confirmDeleteGame());
-            }
-
-            // Modal backdrop clicks
-            document.addEventListener('click', (e) => {
-                if (e.target.classList.contains('modal-backdrop')) {
-                    this.closeAllModals();
-                }
-            });
-        }
-
-        // Authentication Functions
-        async handleSendCode() {
-            const countryCode = document.getElementById('country-code')?.value || '+1';
-            const phoneInput = document.getElementById('phone-input');
-            const phone = phoneInput?.value?.trim();
-
-            this.hideMessage('login-message');
-
-            if (!phone) {
-                this.showMessage('login-message', 'Please enter your phone number', 'error');
-                if (phoneInput) {
-                    phoneInput.focus();
-                }
-                return;
-            }
-
-            const cleanPhone = phone.replace(/[\s\-\(\)]/g, '');
-            if (!/^\d{7,15}$/.test(cleanPhone)) {
-                this.showMessage('login-message', 'Please enter a valid phone number', 'error');
-                if (phoneInput) {
-                    phoneInput.focus();
-                }
-                return;
-            }
-
-            const fullPhone = `${countryCode}${cleanPhone}`;
-
-            try {
-                const sendCodeBtn = document.getElementById('send-code-btn');
-                if (sendCodeBtn) {
-                    sendCodeBtn.classList.add('loading');
-                }
-
-                const result = await this.sendVerificationCode(fullPhone);
-                if (result.success) {
-                    this.switchScreen('verification-screen');
-                    const messageEl = document.getElementById('verification-message');
-                    if (messageEl) {
-                        messageEl.textContent = `Enter the 6-digit code sent to ${fullPhone}`;
-                    }
-                    
-                    const firstOtpInput = document.querySelector('.otp-digit[data-index="0"]');
-                    setTimeout(() => {
-                        if (firstOtpInput) {
-                            firstOtpInput.focus();
-                        }
-                    }, 100);
-                } else {
-                    this.showMessage('login-message', result.message || 'Failed to send code', 'error');
-                }
-            } catch (error) {
-                this.showMessage('login-message', 'Network error. Please try again.', 'error');
-            } finally {
-                const sendCodeBtn = document.getElementById('send-code-btn');
-                if (sendCodeBtn) {
-                    sendCodeBtn.classList.remove('loading');
-                }
-            }
-        }
-
-        async handleVerifyCode() {
-            const otpInputs = document.querySelectorAll('.otp-digit');
-            const code = Array.from(otpInputs).map(input => input.value).join('');
-            const countryCode = document.getElementById('country-code')?.value || '+1';
-            const phoneInput = document.getElementById('phone-input');
-            const cleanPhone = phoneInput?.value?.trim().replace(/[\s\-\(\)]/g, '');
-            const fullPhone = `${countryCode}${cleanPhone}`;
-
-            this.hideMessage('verification-error');
-
-            if (!code || code.length !== 6) {
-                this.showMessage('verification-error', 'Please enter the complete 6-digit code', 'error');
-                if (otpInputs[0]) {
-                    otpInputs[0].focus();
-                }
-                return;
-            }
-
-            if (!/^\d{6}$/.test(code)) {
-                this.showMessage('verification-error', 'Code must contain only numbers', 'error');
-                if (otpInputs[0]) {
-                    otpInputs[0].focus();
-                }
-                return;
-            }
-
-            try {
-                const verifyBtn = document.getElementById('verify-code-btn');
-                if (verifyBtn) {
-                    verifyBtn.classList.add('loading');
-                }
-
-                const result = await this.verifyCode(fullPhone, code);
-                if (result.success) {
-                    this.currentUser = result.user;
-                    this.showDashboard();
-                } else {
-                    this.showMessage('verification-error', result.error?.message || 'Invalid code', 'error');
-                    otpInputs.forEach(input => {
-                        input.value = '';
-                        input.classList.remove('filled');
-                    });
-                    if (otpInputs[0]) {
-                        otpInputs[0].focus();
-                    }
-                }
-            } catch (error) {
-                this.showMessage('verification-error', 'Network error. Please try again.', 'error');
-            } finally {
-                const verifyBtn = document.getElementById('verify-code-btn');
-                if (verifyBtn) {
-                    verifyBtn.classList.remove('loading');
-                }
-            }
-        }
-
-        handleLogout() {
-            if (confirm('Are you sure you want to logout? Any unsaved progress will be lost.')) {
-                this.currentUser = null;
-                this.savedGames = [];
-                this.currentGame = null;
-                this.clearAutoSave();
-                window.miniGolfProData = null;
-                this.showLogin();
-                this.showToast('Logged out successfully', 'success');
-            }
-        }
-
-        // Screen Navigation
-        showLogin() {
+        showLoginScreen() {
             this.switchScreen('login-screen');
-            this.hideMessage('login-message');
-            this.hideMessage('verification-error');
-            
             const phoneInput = document.getElementById('phone-input');
-            const otpInputs = document.querySelectorAll('.otp-digit');
-            
             if (phoneInput) {
                 phoneInput.value = '';
-                setTimeout(() => {
-                    phoneInput.focus();
-                }, 100);
+                setTimeout(() => phoneInput.focus(), 100);
             }
-            
-            otpInputs.forEach(input => {
-                input.value = '';
-                input.classList.remove('filled');
-            });
         }
 
         showDashboard() {
             this.switchScreen('dashboard-screen');
-            const userDisplay = document.getElementById('user-display');
-            if (userDisplay && this.currentUser) {
-                userDisplay.textContent = this.currentUser.display_name || this.currentUser.phone;
-            }
+            this.updateUserProfile();
             this.updateDashboardStats();
-            this.renderSavedGames();
+            this.renderGames();
         }
 
-        showPlayerSetup() {
-            this.switchScreen('setup-screen');
-            this.currentGame = null;
-            this.clearAutoSave();
-            this.generatePlayerInputs();
+        updateUserProfile() {
+            if (!this.currentUser) return;
+            
+            const userInitials = document.getElementById('user-initials');
+            const userPhone = document.getElementById('user-phone');
+            const profileInitials = document.getElementById('profile-initials');
+            const profilePhone = document.getElementById('profile-phone');
+            const memberSince = document.getElementById('member-since');
+            
+            if (userInitials) userInitials.textContent = this.currentUser.initials;
+            if (userPhone) userPhone.textContent = this.currentUser.phone;
+            if (profileInitials) profileInitials.textContent = this.currentUser.initials;
+            if (profilePhone) profilePhone.textContent = this.currentUser.phone;
+            if (memberSince) {
+                const date = new Date(this.currentUser.createdAt).toLocaleDateString();
+                memberSince.textContent = date;
+            }
         }
 
-        // Dashboard Functions
         updateDashboardStats() {
-            const completedGames = this.savedGames.filter(g => g.status === 'completed').length;
-            const inProgressGames = this.savedGames.filter(g => g.status === 'in-progress').length;
-            
-            let bestScore = '--';
-            if (completedGames > 0) {
-                const completedScores = this.savedGames
-                    .filter(g => g.status === 'completed')
-                    .map(g => this.calculateGameTotal(g))
-                    .filter(score => score > 0);
-                
-                if (completedScores.length > 0) {
-                    bestScore = Math.min(...completedScores).toString();
-                }
-            }
-
-            const gamesCompletedEl = document.getElementById('games-completed');
-            const gamesInProgressEl = document.getElementById('games-in-progress');
+            const totalGamesEl = document.getElementById('total-games');
+            const avgScoreEl = document.getElementById('avg-score');
             const bestScoreEl = document.getElementById('best-score');
-
-            if (gamesCompletedEl) gamesCompletedEl.textContent = completedGames;
-            if (gamesInProgressEl) gamesInProgressEl.textContent = inProgressGames;
-            if (bestScoreEl) bestScoreEl.textContent = bestScore;
-        }
-
-        calculateGameTotal(game) {
-            if (!game.players || !game.scores) return 0;
             
-            let bestTotal = Infinity;
-            game.players.forEach((player, index) => {
-                let playerTotal = 0;
-                if (game.scores[index]) {
-                    for (let hole = 1; hole <= game.total_holes; hole++) {
-                        if (game.scores[index][hole]) {
-                            playerTotal += game.scores[index][hole];
-                        }
-                    }
-                }
-                if (playerTotal > 0 && playerTotal < bestTotal) {
-                    bestTotal = playerTotal;
-                }
-            });
-            return bestTotal === Infinity ? 0 : bestTotal;
-        }
-
-        setGameFilter(filter) {
-            this.currentFilter = filter;
+            const completedGames = this.savedGames.filter(g => g.status === 'completed');
+            const totalGames = completedGames.length;
             
-            const filterBtns = document.querySelectorAll('.filter-btn');
-            filterBtns.forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.filter === filter);
-            });
+            if (totalGamesEl) totalGamesEl.textContent = totalGames;
             
-            this.renderSavedGames();
-        }
-
-        renderSavedGames() {
-            const gamesContainer = document.getElementById('games-list');
-            if (!gamesContainer) return;
-
-            let filteredGames = this.savedGames;
-            if (this.currentFilter !== 'all') {
-                filteredGames = this.savedGames.filter(g => g.status === this.currentFilter);
+            if (totalGames > 0) {
+                const totalScores = completedGames.map(game => {
+                    return Math.min(...game.players.map((_, index) => 
+                        Object.values(game.scores[index] || {}).reduce((sum, score) => sum + score, 0)
+                    ));
+                });
+                
+                const avgScore = Math.round(totalScores.reduce((sum, score) => sum + score, 0) / totalScores.length);
+                const bestScore = Math.min(...totalScores);
+                
+                if (avgScoreEl) avgScoreEl.textContent = avgScore;
+                if (bestScoreEl) bestScoreEl.textContent = bestScore;
+            } else {
+                if (avgScoreEl) avgScoreEl.textContent = '-';
+                if (bestScoreEl) bestScoreEl.textContent = '-';
             }
+        }
 
-            if (filteredGames.length === 0) {
-                gamesContainer.innerHTML = '<div class="empty-games">No games found. Start playing!</div>';
+        renderGames() {
+            const container = document.getElementById('games-container');
+            const emptyState = document.getElementById('empty-games');
+            
+            if (!container) return;
+            
+            if (this.savedGames.length === 0) {
+                container.innerHTML = '';
+                if (emptyState) emptyState.classList.remove('hidden');
                 return;
             }
-
+            
+            if (emptyState) emptyState.classList.add('hidden');
+            
             let gamesHTML = '';
-            filteredGames.forEach(game => {
-                const gameDate = new Date(game.created_at).toLocaleDateString();
-                const gameTime = new Date(game.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+            this.savedGames.forEach(game => {
+                const createdDate = new Date(game.createdAt);
+                const now = new Date();
+                const daysDiff = Math.floor((now - createdDate) / (1000 * 60 * 60 * 24));
+                
+                let dateText;
+                if (daysDiff === 0) dateText = 'Today';
+                else if (daysDiff === 1) dateText = 'Yesterday';
+                else if (daysDiff < 7) dateText = `${daysDiff} days ago`;
+                else dateText = createdDate.toLocaleDateString();
+                
+                const timeText = createdDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
                 const statusClass = game.status === 'completed' ? 'status-completed' : 'status-in-progress';
-                const statusText = game.status === 'completed' ? 'Completed' : `Hole ${game.current_hole}/${game.total_holes}`;
-
+                const statusText = game.status === 'completed' ? 'Completed' : `Hole ${game.currentHole}`;
+                
                 let playersHTML = '';
-                if (game.players) {
-                    game.players.forEach(player => {
-                        playersHTML += `
-                            <span class="player-badge">
-                                <span class="player-color-dot" style="background-color: ${player.color}"></span>
-                                ${player.name}
-                            </span>
-                        `;
-                    });
-                }
-
-                gamesHTML += `
-                    <div class="game-card" onclick="window.miniGolfPro.showGameActions('${game.id}')">
-                        <div class="game-header-info">
-                            <h4 class="game-title">${game.name || 'Mini Golf Game'}</h4>
-                            <div class="game-date">${gameDate}<br>${gameTime}</div>
+                game.players.forEach(player => {
+                    playersHTML += `
+                        <div class="player-badge" style="background-color: ${player.color}">
+                            <div class="player-color-dot"></div>
+                            ${player.name}
                         </div>
-                        <div class="game-progress">${statusText}</div>
+                    `;
+                });
+                
+                gamesHTML += `
+                    <div class="game-card" onclick="window.gameApp.showGameActions('${game.id}')">
+                        <div class="game-card-header">
+                            <h4 class="game-title">${game.name || 'Mini Golf Game'}</h4>
+                            <div class="game-date">
+                                <div>${dateText}</div>
+                                <div>${timeText}</div>
+                            </div>
+                        </div>
+                        <div class="game-progress">Progress: ${statusText} of ${game.totalHoles || 18}</div>
                         <div class="game-players">${playersHTML}</div>
-                        <div class="game-status ${statusClass}">${game.status === 'completed' ? '✅ Completed' : '⏳ In Progress'}</div>
+                        <div class="game-status ${statusClass}">${game.status === 'completed' ? 'Completed' : 'In Progress'}</div>
                     </div>
                 `;
             });
-
-            gamesContainer.innerHTML = gamesHTML;
+            
+            container.innerHTML = gamesHTML;
         }
 
-        // Player Setup
+        // ===== PLAYER SETUP =====
+        showPlayerSetup(existingGame = null) {
+            this.switchScreen('setup-screen');
+            this.currentGame = existingGame;
+            
+            const titleText = document.getElementById('setup-title-text');
+            if (titleText) {
+                titleText.textContent = existingGame ? 'Edit Game' : 'New Game Setup';
+            }
+            
+            // Initialize form with existing data or defaults
+            const gameNameInput = document.getElementById('game-name-input');
+            const courseType = document.getElementById('course-type');
+            
+            if (gameNameInput) {
+                gameNameInput.value = existingGame?.name || `Game ${new Date().toLocaleDateString()}`;
+            }
+            
+            if (courseType) {
+                courseType.value = existingGame?.totalHoles?.toString() || '18';
+                this.handleCourseTypeChange();
+            }
+            
+            // Set player count and generate inputs
+            this.playerCount = existingGame?.players?.length || 2;
+            this.updatePlayerCountDisplay();
+            this.generatePlayerInputs();
+        }
+
+        updatePlayerCountDisplay() {
+            const display = document.getElementById('player-count-display');
+            if (display) {
+                display.textContent = `${this.playerCount} ${this.playerCount === 1 ? 'Player' : 'Players'}`;
+            }
+            
+            const decreaseBtn = document.getElementById('decrease-players');
+            const increaseBtn = document.getElementById('increase-players');
+            
+            if (decreaseBtn) decreaseBtn.disabled = this.playerCount <= 1;
+            if (increaseBtn) increaseBtn.disabled = this.playerCount >= this.config.maxPlayers;
+        }
+
         generatePlayerInputs() {
-            const playerCountSelect = document.getElementById('player-count');
-            const container = document.getElementById('player-names');
-
-            if (!playerCountSelect || !container) return;
-
-            const playerCount = parseInt(playerCountSelect.value);
+            const container = document.getElementById('players-container');
+            if (!container) return;
+            
             container.innerHTML = '';
-
-            for (let i = 0; i < playerCount; i++) {
+            
+            for (let i = 0; i < this.playerCount; i++) {
                 const playerDiv = document.createElement('div');
                 playerDiv.className = 'player-input';
                 
-                const defaultName = this.currentGame?.players?.[i]?.name || `Player ${i + 1}`;
-                const selectedColor = this.currentGame?.players?.[i]?.color || this.config.playerColors[i % this.config.playerColors.length];
+                const existingPlayer = this.currentGame?.players?.[i];
+                const playerName = existingPlayer?.name || `Player ${i + 1}`;
+                const selectedColor = existingPlayer?.color || this.config.playerColors[i % this.config.playerColors.length];
                 
                 let colorOptionsHTML = '';
-                this.config.playerColors.forEach((color, colorIndex) => {
+                this.config.playerColors.forEach(color => {
                     const isSelected = color === selectedColor ? 'selected' : '';
                     colorOptionsHTML += `
                         <div class="color-option ${isSelected}" 
                              style="background-color: ${color}" 
                              data-color="${color}"
-                             onclick="window.miniGolfPro.selectColor(${i}, '${color}')"></div>
+                             onclick="window.gameApp.selectPlayerColor(${i}, '${color}')"></div>
                     `;
                 });
-
+                
                 playerDiv.innerHTML = `
-                    <div class="player-number" style="--player-color: ${selectedColor}">${i + 1}</div>
-                    <div class="player-name-group">
-                        <label class="form-label">Player ${i + 1} Name</label>
-                        <input type="text" class="form-control" id="player-${i}" 
-                               value="${defaultName}" placeholder="Enter name">
+                    <div class="player-number" id="player-number-${i}" style="--player-color: ${selectedColor}">
+                        ${i + 1}
                     </div>
-                    <div class="color-picker-group">
-                        <label class="form-label">Color</label>
-                        <div class="color-options">${colorOptionsHTML}</div>
+                    <div class="player-name-input">
+                        <input type="text" class="form-control" id="player-name-${i}" 
+                               value="${playerName}" placeholder="Player ${i + 1}">
+                    </div>
+                    <div class="color-picker">
+                        ${colorOptionsHTML}
                     </div>
                 `;
                 
                 container.appendChild(playerDiv);
-
-                const nameInput = document.getElementById(`player-${i}`);
+                
+                // Add event listeners
+                const nameInput = document.getElementById(`player-name-${i}`);
                 if (nameInput) {
-                    nameInput.addEventListener('input', (e) => {
-                        this.updatePlayerNumber(i, e.target.value);
-                    });
+                    nameInput.addEventListener('input', () => this.validatePlayerInputs());
                 }
             }
+            
+            this.validatePlayerInputs();
         }
 
-        selectColor(playerIndex, color) {
-            const container = document.getElementById('player-names');
-            const playerInput = container?.children[playerIndex];
+        selectPlayerColor(playerIndex, color) {
+            // Update UI
+            const playerInput = document.querySelector(`#players-container .player-input:nth-child(${playerIndex + 1})`);
             if (playerInput) {
-                const colorOptions = playerInput.querySelectorAll('.color-option');
-                colorOptions.forEach(option => option.classList.remove('selected'));
-
+                // Remove selected class from all colors
+                playerInput.querySelectorAll('.color-option').forEach(option => {
+                    option.classList.remove('selected');
+                });
+                
+                // Add selected class to clicked color
                 const selectedOption = playerInput.querySelector(`[data-color="${color}"]`);
                 if (selectedOption) {
                     selectedOption.classList.add('selected');
                 }
-
-                const playerNumber = playerInput.querySelector('.player-number');
+                
+                // Update player number color
+                const playerNumber = document.getElementById(`player-number-${playerIndex}`);
                 if (playerNumber) {
                     playerNumber.style.setProperty('--player-color', color);
                 }
             }
-        }
-
-        updatePlayerNumber(playerIndex, name) {
-            const playerNumber = document.querySelector(`#player-names .player-input:nth-child(${playerIndex + 1}) .player-number`);
-            if (playerNumber && name.trim()) {
-                playerNumber.textContent = playerIndex + 1;
-            }
-        }
-
-        // Game Functions
-        async startGame() {
-            const playerCountSelect = document.getElementById('player-count');
-            const totalHolesSelect = document.getElementById('total-holes');
             
-            if (!playerCountSelect || !totalHolesSelect) return;
+            this.validatePlayerInputs();
+        }
 
-            const playerCount = parseInt(playerCountSelect.value);
-            this.totalHoles = parseInt(totalHolesSelect.value);
+        validatePlayerInputs() {
+            const startBtn = document.getElementById('start-new-game');
+            if (!startBtn) return;
+            
+            let isValid = true;
+            const usedColors = new Set();
+            
+            for (let i = 0; i < this.playerCount; i++) {
+                const nameInput = document.getElementById(`player-name-${i}`);
+                const selectedColor = document.querySelector(`#players-container .player-input:nth-child(${i + 1}) .color-option.selected`);
+                
+                if (!nameInput?.value.trim() || !selectedColor) {
+                    isValid = false;
+                    break;
+                }
+                
+                const color = selectedColor.getAttribute('data-color');
+                if (usedColors.has(color)) {
+                    isValid = false;
+                    break;
+                }
+                usedColors.add(color);
+            }
+            
+            startBtn.disabled = !isValid;
+        }
+
+        // ===== GAME PLAY =====
+        async startNewGame() {
+            const gameNameInput = document.getElementById('game-name-input');
+            const courseType = document.getElementById('course-type');
+            const customHoles = document.getElementById('custom-holes');
+            
+            const gameName = gameNameInput?.value.trim() || `Game ${new Date().toLocaleDateString()}`;
+            let holes = parseInt(courseType?.value) || 18;
+            
+            if (courseType?.value === 'custom') {
+                holes = parseInt(customHoles?.value) || 18;
+            }
+            
+            // Collect player data
             this.players = [];
             this.scores = {};
-
-            for (let i = 0; i < playerCount; i++) {
-                const nameInput = document.getElementById(`player-${i}`);
-                const selectedColorEl = document.querySelector(`#player-names .player-input:nth-child(${i + 1}) .color-option.selected`);
+            
+            for (let i = 0; i < this.playerCount; i++) {
+                const nameInput = document.getElementById(`player-name-${i}`);
+                const selectedColor = document.querySelector(`#players-container .player-input:nth-child(${i + 1}) .color-option.selected`);
                 
-                const name = nameInput?.value?.trim() || `Player ${i + 1}`;
-                const color = selectedColorEl?.getAttribute('data-color') || this.config.playerColors[i % this.config.playerColors.length];
+                const name = nameInput?.value.trim() || `Player ${i + 1}`;
+                const color = selectedColor?.getAttribute('data-color') || this.config.playerColors[i];
                 
                 this.players.push({ name, color });
                 this.scores[i] = this.currentGame?.scores?.[i] || {};
             }
-
-            this.currentHole = this.currentGame?.current_hole || 1;
+            
+            this.currentHole = this.currentGame?.currentHole || 1;
+            this.totalHoles = holes;
             this.gameComplete = false;
-
+            this.gameStartTime = new Date().toISOString();
+            
+            // Create game data
             const gameData = {
                 id: this.currentGame?.id || null,
-                user_id: this.currentUser.id,
-                name: this.currentGame?.name || `Game ${new Date().toLocaleDateString()}`,
+                userId: this.currentUser.id,
+                name: gameName,
                 players: this.players,
                 scores: this.scores,
-                current_hole: this.currentHole,
-                total_holes: this.totalHoles,
+                currentHole: this.currentHole,
+                totalHoles: this.totalHoles,
                 status: 'in-progress',
-                created_at: this.currentGame?.created_at || new Date().toISOString()
+                startTime: this.gameStartTime
             };
-
-            const saveResult = await this.saveGame(gameData);
-            if (saveResult.success) {
-                this.currentGame = saveResult.data;
-                this.switchScreen('game-screen');
-                this.generateScoreInputs();
-                this.generateHoleSelectors();
-                this.updateDisplay();
-                this.updateLeaderboard();
-                this.showScoreTab();
-                this.setupAutoSave();
-                this.showToast('Game started! Auto-saving enabled.', 'success');
-            }
-        }
-
-        // Fix: Synchronized hole selector generation
-        generateHoleSelectors() {
-            this.generateHoleSelectorTop();
-            this.generateHoleSelectorBottom();
-        }
-
-        generateHoleSelectorTop() {
-            const container = document.getElementById('hole-selector-top');
-            if (!container) return;
-
-            container.innerHTML = '';
             
-            for (let hole = 1; hole <= this.totalHoles; hole++) {
-                const holeBtn = document.createElement('div');
-                holeBtn.className = 'hole-number';
-                holeBtn.textContent = hole;
-                holeBtn.onclick = () => this.goToHole(hole);
-                
-                if (hole === this.currentHole) {
-                    holeBtn.classList.add('current');
-                } else if (this.isHoleCompleted(hole)) {
-                    holeBtn.classList.add('completed');
-                }
-                
-                container.appendChild(holeBtn);
+            const result = await this.saveGame(gameData);
+            if (result.success) {
+                this.currentGame = result.game;
+                this.showGameScreen();
             }
         }
 
-        generateHoleSelectorBottom() {
-            const container = document.getElementById('hole-selector-bottom');
-            if (!container) return;
+        showGameScreen() {
+            this.switchScreen('game-screen');
+            this.updateGameHeader();
+            this.generateHoleSelector();
+            this.generateScoreInputs();
+            this.updateLeaderboard();
+            this.updateScorecard();
+            this.showScoreTab();
+        }
 
-            container.innerHTML = '';
+        updateGameHeader() {
+            const gameTitle = document.getElementById('game-title');
+            const holeNumber = document.getElementById('hole-number');
+            const totalHolesEl = document.getElementById('total-holes');
+            const progressIndicator = document.getElementById('progress-indicator');
+            const progressPercentage = document.getElementById('progress-percentage');
             
-            for (let hole = 1; hole <= this.totalHoles; hole++) {
-                const indicator = document.createElement('div');
-                indicator.className = 'hole-indicator';
-                indicator.title = `Hole ${hole}`;
-                indicator.onclick = () => this.goToHole(hole);
-                
-                if (hole === this.currentHole) {
-                    indicator.classList.add('current');
-                } else if (this.isHoleCompleted(hole)) {
-                    indicator.classList.add('completed');
-                }
-                
-                container.appendChild(indicator);
-            }
+            if (gameTitle) gameTitle.textContent = this.currentGame?.name || 'Game in Progress';
+            if (holeNumber) holeNumber.textContent = `Hole ${this.currentHole}`;
+            if (totalHolesEl) totalHolesEl.textContent = this.totalHoles;
+            
+            const progress = ((this.currentHole - 1) / this.totalHoles) * 100;
+            if (progressIndicator) progressIndicator.style.width = `${progress}%`;
+            if (progressPercentage) progressPercentage.textContent = `${Math.round(progress)}%`;
         }
 
-        // Fix: Synchronized hole navigation
-        goToHole(holeNumber) {
-            if (holeNumber >= 1 && holeNumber <= this.totalHoles) {
-                this.currentHole = holeNumber;
-                this.generateScoreInputs();
-                this.updateDisplay();
-                this.generateHoleSelectors(); // Update both selectors
-                this.autoSaveGame();
+        generateHoleSelector() {
+            const selector = document.getElementById('hole-selector');
+            if (!selector) return;
+            
+            selector.innerHTML = '';
+            for (let i = 1; i <= this.totalHoles; i++) {
+                const option = document.createElement('option');
+                option.value = i;
+                option.textContent = `Hole ${i}`;
+                if (i === this.currentHole) option.selected = true;
+                selector.appendChild(option);
             }
-        }
-
-        isHoleCompleted(hole) {
-            return this.players.every((player, index) => {
-                return this.scores[index] && this.scores[index][hole];
-            });
         }
 
         generateScoreInputs() {
-            const container = document.getElementById('score-inputs');
+            const container = document.getElementById('score-players');
             if (!container) return;
-
+            
             container.innerHTML = '';
-
+            
             this.players.forEach((player, index) => {
-                const scoreDiv = document.createElement('div');
-                scoreDiv.className = 'score-input-group';
-                scoreDiv.style.setProperty('--player-color', player.color);
-
-                const currentScore = this.scores[index][this.currentHole] || '';
-                const total = this.calculatePlayerTotal(index);
-
-                scoreDiv.innerHTML = `
-                    <div class="player-info">
-                        <div class="player-avatar" style="--player-color: ${player.color}">${index + 1}</div>
-                        <div class="player-details">
-                            <div class="player-name">${player.name}</div>
-                            <div class="player-total">Total: ${total}</div>
-                        </div>
+                const playerDiv = document.createElement('div');
+                playerDiv.className = 'score-player';
+                playerDiv.style.setProperty('--player-color', player.color);
+                playerDiv.style.setProperty('--player-color-rgb', this.hexToRgb(player.color));
+                
+                const currentScore = this.scores[index]?.[this.currentHole] || '';
+                const totalScore = this.calculatePlayerTotal(index);
+                
+                playerDiv.innerHTML = `
+                    <div class="player-avatar">${player.name.charAt(0).toUpperCase()}</div>
+                    <div class="player-details">
+                        <div class="player-name">${player.name}</div>
+                        <div class="player-total">Total: ${totalScore}</div>
                     </div>
                     <input type="number" class="score-input" id="score-${index}" 
-                           min="${this.config.scoreRange.min}" max="${this.config.scoreRange.max}" 
-                           value="${currentScore}" placeholder="0">
+                           min="1" max="15" value="${currentScore}" placeholder="-"
+                           data-player-index="${index}">
                 `;
                 
-                container.appendChild(scoreDiv);
-
-                scoreDiv.addEventListener('click', () => this.selectPlayer(index));
-
+                container.appendChild(playerDiv);
+                
+                // Add event listener
                 const scoreInput = document.getElementById(`score-${index}`);
                 if (scoreInput) {
-                    scoreInput.addEventListener('input', (e) => {
-                        this.updateScore(index, e.target.value);
-                    });
-                    scoreInput.addEventListener('focus', (e) => {
-                        e.target.select();
-                        this.selectPlayer(index);
-                    });
+                    scoreInput.addEventListener('input', (e) => this.updateScore(index, e.target.value));
+                    scoreInput.addEventListener('focus', () => this.setActivePlayer(index));
                 }
             });
-
-            this.updateSelectedPlayerIndicator();
+            
+            this.updateNavigationButtons();
         }
 
-        selectPlayer(index) {
-            this.selectedPlayerIndex = index;
+        setActivePlayer(index) {
+            this.activePlayerIndex = index;
             
-            const scoreGroups = document.querySelectorAll('.score-input-group');
-            scoreGroups.forEach((group, i) => {
-                group.classList.toggle('selected', i === index);
-            });
-            
-            this.updateSelectedPlayerIndicator();
-        }
-
-        updateSelectedPlayerIndicator() {
-            const indicator = document.getElementById('selected-player');
-            if (indicator) {
-                if (this.selectedPlayerIndex !== null) {
-                    const player = this.players[this.selectedPlayerIndex];
-                    indicator.textContent = `Selected: ${player.name}`;
-                    indicator.style.color = player.color;
-                } else {
-                    indicator.textContent = 'Select a player to use quick scoring';
-                    indicator.style.color = '';
-                }
+            // Update quick score buttons
+            const quickScores = document.getElementById('quick-scores');
+            if (quickScores) {
+                quickScores.innerHTML = '';
+                this.config.quickScores.forEach(score => {
+                    const btn = document.createElement('button');
+                    btn.className = 'quick-score-btn';
+                    btn.setAttribute('data-score', score);
+                    btn.textContent = score === 5 ? '5+' : score;
+                    btn.addEventListener('click', () => this.setQuickScore(score));
+                    quickScores.appendChild(btn);
+                });
             }
         }
 
-        setQuickScore(playerIndex, score) {
-            if (playerIndex >= 0 && playerIndex < this.players.length) {
-                const scoreInput = document.getElementById(`score-${playerIndex}`);
+        setQuickScore(score) {
+            if (this.activePlayerIndex !== null) {
+                const scoreInput = document.getElementById(`score-${this.activePlayerIndex}`);
                 if (scoreInput) {
-                    scoreInput.value = score;
-                    this.updateScore(playerIndex, score);
-                    this.showToast(`${this.players[playerIndex].name}: ${score}`, 'success');
+                    const actualScore = score === 5 ? 5 : score;
+                    scoreInput.value = actualScore;
+                    this.updateScore(this.activePlayerIndex, actualScore);
+                    
+                    // Move to next player if not the last one
+                    if (this.activePlayerIndex < this.players.length - 1) {
+                        const nextInput = document.getElementById(`score-${this.activePlayerIndex + 1}`);
+                        if (nextInput) {
+                            nextInput.focus();
+                        }
+                    }
                 }
             }
         }
 
         updateScore(playerIndex, score) {
             const numScore = parseInt(score);
-            if (isNaN(numScore) || numScore < this.config.scoreRange.min || numScore > this.config.scoreRange.max) {
+            
+            if (isNaN(numScore) || numScore < 1 || numScore > 15) {
                 if (this.scores[playerIndex]) {
                     delete this.scores[playerIndex][this.currentHole];
                 }
@@ -1127,295 +1030,105 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
                 this.scores[playerIndex][this.currentHole] = numScore;
             }
-
-            this.updateDisplay();
-            this.updateLeaderboard();
-            this.generateHoleSelectors(); // Update completion status
-            this.scheduleAutoSave();
-        }
-
-        // Auto-save system
-        setupAutoSave() {
-            this.clearAutoSave();
-            this.scheduleAutoSave();
-        }
-
-        scheduleAutoSave() {
-            if (this.autoSaveTimer) {
-                clearTimeout(this.autoSaveTimer);
-            }
             
-            this.autoSaveTimer = setTimeout(() => {
-                this.autoSaveGame();
-            }, this.config.autoSaveInterval);
+            this.updatePlayerTotals();
+            this.updateLeaderboard();
+            this.updateScorecard();
+            this.autoSaveGame();
         }
 
-        async autoSaveGame() {
-            if (this.currentGame) {
-                const gameData = {
-                    ...this.currentGame,
-                    scores: this.scores,
-                    current_hole: this.currentHole,
-                    status: this.gameComplete ? 'completed' : 'in-progress'
-                };
-                
-                try {
-                    await this.saveGame(gameData);
-                    this.currentGame = gameData;
-                } catch (error) {
-                    console.error('Auto-save failed:', error);
+        updatePlayerTotals() {
+            this.players.forEach((player, index) => {
+                const totalEl = document.querySelector(`#score-players .score-player:nth-child(${index + 1}) .player-total`);
+                if (totalEl) {
+                    totalEl.textContent = `Total: ${this.calculatePlayerTotal(index)}`;
                 }
-            }
-        }
-
-        clearAutoSave() {
-            if (this.autoSaveTimer) {
-                clearTimeout(this.autoSaveTimer);
-                this.autoSaveTimer = null;
-            }
-        }
-
-        updateAutoSaveIndicator() {
-            const indicator = document.querySelector('.auto-save-indicator');
-            if (indicator) {
-                indicator.style.opacity = '1';
-                setTimeout(() => {
-                    if (indicator) indicator.style.opacity = '0.7';
-                }, 1000);
-            }
+            });
         }
 
         calculatePlayerTotal(playerIndex) {
-            let total = 0;
-            if (this.scores[playerIndex]) {
-                for (let hole = 1; hole <= this.totalHoles; hole++) {
-                    if (this.scores[playerIndex][hole]) {
-                        total += this.scores[playerIndex][hole];
-                    }
-                }
-            }
-            return total;
+            if (!this.scores[playerIndex]) return 0;
+            return Object.values(this.scores[playerIndex]).reduce((sum, score) => sum + score, 0);
         }
 
-        // Fix: Synchronized display updates
-        updateDisplay() {
-            const holeDisplay = document.getElementById('hole-display');
-            const progressFill = document.getElementById('progress-fill');
-            const progressText = document.getElementById('progress-text');
-            const prevBtn = document.getElementById('prev-hole');
-            const nextBtn = document.getElementById('next-hole');
-            const prevBtnTop = document.getElementById('prev-hole-top');
-            const nextBtnTop = document.getElementById('next-hole-top');
-
-            if (holeDisplay) {
-                holeDisplay.textContent = `Hole ${this.currentHole} of ${this.totalHoles}`;
+        updateNavigationButtons() {
+            const prevBtn = document.getElementById('prev-hole-btn');
+            const nextBtn = document.getElementById('next-hole-btn');
+            
+            if (prevBtn) {
+                prevBtn.disabled = this.currentHole === 1;
             }
-
-            const progress = (this.currentHole - 1) / this.totalHoles * 100;
-            if (progressFill) {
-                progressFill.style.width = `${progress}%`;
-            }
-            if (progressText) {
-                progressText.textContent = `${Math.round(progress)}%`;
-            }
-
-            const isFirstHole = this.currentHole === 1;
-            const isLastHole = this.currentHole === this.totalHoles;
-
-            [prevBtn, prevBtnTop].forEach(btn => {
-                if (btn) btn.disabled = isFirstHole;
-            });
-
-            [nextBtn, nextBtnTop].forEach(btn => {
-                if (btn) btn.textContent = isLastHole ? 'Finish Game' : 'Next';
-            });
-
-            this.players.forEach((player, index) => {
-                const totalElement = document.querySelector(`#score-inputs .score-input-group:nth-child(${index + 1}) .player-total`);
-                if (totalElement) {
-                    totalElement.textContent = `Total: ${this.calculatePlayerTotal(index)}`;
+            
+            if (nextBtn) {
+                const btnText = nextBtn.querySelector('.btn-text');
+                const btnIcon = nextBtn.querySelector('.btn-icon');
+                
+                if (this.currentHole === this.totalHoles) {
+                    if (btnText) btnText.textContent = 'Finish';
+                    if (btnIcon) btnIcon.textContent = '🏁';
+                } else {
+                    if (btnText) btnText.textContent = 'Next';
+                    if (btnIcon) btnIcon.textContent = '→';
                 }
-            });
+            }
         }
 
+        // ===== NAVIGATION =====
         previousHole() {
             if (this.currentHole > 1) {
                 this.currentHole--;
+                this.updateGameHeader();
                 this.generateScoreInputs();
-                this.updateDisplay();
-                this.generateHoleSelectors();
-                this.scheduleAutoSave();
+                this.autoSaveGame();
             }
         }
 
         nextHole() {
             if (this.currentHole < this.totalHoles) {
                 this.currentHole++;
+                this.updateGameHeader();
                 this.generateScoreInputs();
-                this.updateDisplay();
-                this.generateHoleSelectors();
-                this.scheduleAutoSave();
+                this.autoSaveGame();
             } else {
                 this.completeGame();
             }
         }
 
-        completeGame() {
-            this.gameComplete = true;
-            this.clearAutoSave();
-            this.showGameCompleteModal();
-        }
-
-        async saveAndExit() {
-            if (this.currentGame) {
-                await this.autoSaveGame();
-                this.clearAutoSave();
-                this.showToast('Game saved successfully!', 'success');
-                this.showDashboard();
-            }
-        }
-
-        // Modal Functions
-        showGameCompleteModal() {
-            const modal = document.getElementById('game-complete-modal');
-            const resultsContainer = document.getElementById('final-results');
-
-            if (!modal || !resultsContainer) return;
-
-            const sortedPlayers = this.getSortedPlayers();
-            let resultsHTML = '<div class="leaderboard-grid">';
-
-            sortedPlayers.forEach((player, index) => {
-                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '';
-                resultsHTML += `
-                    <div class="leaderboard-item ${index === 0 ? 'leader' : ''}" 
-                         style="--player-color: ${player.color}">
-                        <div class="player-rank">
-                            <div class="rank-number">${index + 1}</div>
-                            <div class="rank-name">${medal} ${player.name}</div>
-                        </div>
-                        <div class="rank-score">${player.total}</div>
-                    </div>
-                `;
-            });
-
-            resultsHTML += '</div>';
-            resultsContainer.innerHTML = resultsHTML;
-            modal.classList.remove('hidden');
-        }
-
-        async saveCompletedGame() {
-            if (this.currentGame) {
-                this.currentGame.status = 'completed';
-                await this.autoSaveGame();
-                this.hideGameComplete();
-                this.showToast('Game completed and saved!', 'success');
-                this.showDashboard();
-            }
-        }
-
-        shareGame() {
-            const winner = this.getSortedPlayers()[0];
-            const gameData = {
-                winner: winner.name,
-                score: winner.total,
-                players: this.players.length,
-                holes: this.totalHoles,
-                date: new Date().toLocaleDateString()
-            };
-            
-            if (navigator.share) {
-                navigator.share({
-                    title: 'Mini Golf Pro Results',
-                    text: `🏆 ${gameData.winner} won with ${gameData.score} strokes!`,
-                    url: window.location.href
-                });
-            } else {
-                const shareText = `🏆 ${gameData.winner} won with ${gameData.score} strokes! ${gameData.players} players, ${gameData.holes} holes.`;
-                navigator.clipboard.writeText(shareText).then(() => {
-                    this.showToast('Results copied to clipboard!', 'success');
-                });
-            }
-        }
-
-        showGameActions(gameId) {
-            this.selectedGameId = gameId;
-            const modal = document.getElementById('game-actions-modal');
-            if (modal) modal.classList.remove('hidden');
-        }
-
-        hideGameActions() {
-            const modal = document.getElementById('game-actions-modal');
-            if (modal) modal.classList.add('hidden');
-            this.selectedGameId = null;
-        }
-
-        continueGame() {
-            const game = this.savedGames.find(g => g.id === this.selectedGameId);
-            if (game) {
-                this.currentGame = game;
-                this.players = game.players;
-                this.scores = game.scores;
-                this.currentHole = game.current_hole || 1;
-                this.totalHoles = game.total_holes || 18;
-                this.gameComplete = game.status === 'completed';
-
-                this.switchScreen('game-screen');
+        jumpToHole(holeNumber) {
+            const hole = parseInt(holeNumber);
+            if (hole >= 1 && hole <= this.totalHoles) {
+                this.currentHole = hole;
+                this.updateGameHeader();
                 this.generateScoreInputs();
-                this.generateHoleSelectors();
-                this.updateDisplay();
-                this.updateLeaderboard();
-                this.showScoreTab();
-                if (!this.gameComplete) {
-                    this.setupAutoSave();
-                }
+                this.autoSaveGame();
             }
-            this.hideGameActions();
         }
 
-        editGame() {
-            const game = this.savedGames.find(g => g.id === this.selectedGameId);
-            if (game) {
-                this.currentGame = game;
-                this.showPlayerSetup();
+        // ===== LEADERBOARD =====
+        updateLeaderboard() {
+            const container = document.getElementById('leaderboard-list');
+            if (!container) return;
+            
+            const sortedPlayers = this.getSortedPlayers();
+            
+            container.innerHTML = '';
+            sortedPlayers.forEach((player, rank) => {
+                const playerDiv = document.createElement('div');
+                playerDiv.className = `leaderboard-item ${rank === 0 ? 'leader' : ''}`;
+                playerDiv.style.setProperty('--player-color', player.color);
                 
-                const playerCountSelect = document.getElementById('player-count');
-                const totalHolesSelect = document.getElementById('total-holes');
+                const medal = rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : '';
                 
-                if (playerCountSelect) playerCountSelect.value = game.players.length.toString();
-                if (totalHolesSelect) totalHolesSelect.value = game.total_holes.toString();
+                playerDiv.innerHTML = `
+                    <div class="player-rank">
+                        <div class="rank-number">${rank + 1}</div>
+                        <div class="rank-name">${medal} ${player.name}</div>
+                    </div>
+                    <div class="rank-score">${player.total}</div>
+                `;
                 
-                this.totalHoles = game.total_holes;
-                setTimeout(() => this.generatePlayerInputs(), 100);
-            }
-            this.hideGameActions();
-        }
-
-        duplicateGame() {
-            const game = this.savedGames.find(g => g.id === this.selectedGameId);
-            if (game) {
-                const duplicatedGame = {
-                    ...game,
-                    id: null,
-                    name: `${game.name} (Copy)`,
-                    scores: {},
-                    current_hole: 1,
-                    status: 'in-progress'
-                };
-                
-                this.currentGame = duplicatedGame;
-                this.showPlayerSetup();
-            }
-            this.hideGameActions();
-        }
-
-        async confirmDeleteGame() {
-            if (confirm('Are you sure you want to delete this game?')) {
-                await this.deleteGame(this.selectedGameId);
-                this.renderSavedGames();
-                this.updateDashboardStats();
-            }
-            this.hideGameActions();
+                container.appendChild(playerDiv);
+            });
         }
 
         getSortedPlayers() {
@@ -1426,150 +1139,747 @@ document.addEventListener('DOMContentLoaded', function() {
             })).sort((a, b) => a.total - b.total);
         }
 
-        updateLeaderboard() {
-            const container = document.getElementById('leaderboard-list');
-            const title = document.getElementById('leaderboard-title');
-
-            if (!container) return;
-
-            const sortedPlayers = this.getSortedPlayers();
-
-            if (title) {
-                title.textContent = this.gameComplete ? 'Final Results' : 'Current Standings';
-            }
-
-            let leaderboardHTML = '';
-            sortedPlayers.forEach((player, index) => {
-                const isLeader = index === 0 && player.total > 0;
-                leaderboardHTML += `
-                    <div class="leaderboard-item ${isLeader ? 'leader' : ''}"
-                         style="--player-color: ${player.color}">
-                        <div class="player-rank">
-                            <div class="rank-number">${index + 1}</div>
-                            <div class="rank-name">${player.name}</div>
-                        </div>
-                        <div class="rank-score">${player.total || 0}</div>
-                    </div>
-                `;
-            });
-
-            container.innerHTML = leaderboardHTML;
-        }
-
-        showScoreTab() {
-            const scoreTab = document.getElementById('score-tab');
-            const leaderboardTab = document.getElementById('leaderboard-tab');
-            const scoreContent = document.getElementById('score-content');
-            const leaderboardContent = document.getElementById('leaderboard-content');
-
-            if (scoreTab) scoreTab.classList.add('active');
-            if (leaderboardTab) leaderboardTab.classList.remove('active');
-            if (scoreContent) scoreContent.classList.add('active');
-            if (leaderboardContent) leaderboardContent.classList.remove('active');
-        }
-
-        showLeaderboardTab() {
-            const scoreTab = document.getElementById('score-tab');
-            const leaderboardTab = document.getElementById('leaderboard-tab');
-            const scoreContent = document.getElementById('score-content');
-            const leaderboardContent = document.getElementById('leaderboard-content');
-
-            if (scoreTab) scoreTab.classList.remove('active');
-            if (leaderboardTab) leaderboardTab.classList.add('active');
-            if (scoreContent) scoreContent.classList.remove('active');
-            if (leaderboardContent) leaderboardContent.classList.add('active');
-
-            this.updateLeaderboard();
-        }
-
-        showScorecard() {
-            const modal = document.getElementById('scorecard-modal');
+        // ===== SCORECARD =====
+        updateScorecard() {
             const container = document.getElementById('scorecard-table');
-
-            if (!modal || !container) return;
-
-            let tableHTML = '<table class="scorecard-table"><thead><tr><th class="player-name">Player</th>';
+            if (!container) return;
             
+            let tableHTML = '<table><thead><tr><th class="player-name">Player</th>';
+            
+            // Hole headers
             for (let hole = 1; hole <= this.totalHoles; hole++) {
                 tableHTML += `<th>H${hole}</th>`;
             }
             tableHTML += '<th>Total</th></tr></thead><tbody>';
-
+            
+            // Player rows
             this.players.forEach((player, index) => {
                 tableHTML += `<tr><td class="player-name" style="color: ${player.color}"><strong>${player.name}</strong></td>`;
+                
                 for (let hole = 1; hole <= this.totalHoles; hole++) {
-                    const score = this.scores[index]?.[hole] || '';
-                    const cellClass = score ? '' : 'empty-score';
-                    tableHTML += `<td class="${cellClass}">${score || '-'}</td>`;
+                    const score = this.scores[index]?.[hole] || '-';
+                    const isCurrent = hole === this.currentHole ? 'current-hole' : '';
+                    tableHTML += `<td class="${isCurrent}">${score}</td>`;
                 }
+                
                 const total = this.calculatePlayerTotal(index);
-                tableHTML += `<td class="total-score">${total}</td></tr>`;
+                tableHTML += `<td class="total-cell">${total}</td></tr>`;
             });
-
+            
             tableHTML += '</tbody></table>';
             container.innerHTML = tableHTML;
+        }
+
+        // ===== GAME COMPLETION =====
+        completeGame() {
+            this.gameComplete = true;
+            if (this.currentGame) {
+                this.currentGame.status = 'completed';
+            }
+            this.showGameCompleteModal();
+        }
+
+        showGameCompleteModal() {
+            const modal = document.getElementById('game-complete-modal');
+            const finalLeaderboard = document.getElementById('final-leaderboard');
+            const gameStats = document.getElementById('game-stats');
+            
+            if (!modal) return;
+            
+            // Update final leaderboard
+            if (finalLeaderboard) {
+                const sortedPlayers = this.getSortedPlayers();
+                let leaderboardHTML = '';
+                
+                sortedPlayers.forEach((player, rank) => {
+                    const medal = rank === 0 ? '🥇' : rank === 1 ? '🥈' : rank === 2 ? '🥉' : '';
+                    leaderboardHTML += `
+                        <div class="leaderboard-item ${rank === 0 ? 'leader' : ''}" style="--player-color: ${player.color}">
+                            <div class="player-rank">
+                                <div class="rank-number">${rank + 1}</div>
+                                <div class="rank-name">${medal} ${player.name}</div>
+                            </div>
+                            <div class="rank-score">${player.total}</div>
+                        </div>
+                    `;
+                });
+                
+                finalLeaderboard.innerHTML = leaderboardHTML;
+            }
+            
+            // Update game stats
+            if (gameStats) {
+                const winner = this.getSortedPlayers()[0];
+                const totalTime = this.calculateGameDuration();
+                
+                gameStats.innerHTML = `
+                    <div class="celebration-stat">
+                        <div class="celebration-stat-number">${winner.total}</div>
+                        <div class="celebration-stat-label">Winning Score</div>
+                    </div>
+                    <div class="celebration-stat">
+                        <div class="celebration-stat-number">${totalTime}</div>
+                        <div class="celebration-stat-label">Game Duration</div>
+                    </div>
+                `;
+            }
+            
             modal.classList.remove('hidden');
         }
 
-        hideScorecard() {
-            const modal = document.getElementById('scorecard-modal');
-            if (modal) modal.classList.add('hidden');
+        calculateGameDuration() {
+            if (!this.gameStartTime) return '0m';
+            
+            const start = new Date(this.gameStartTime);
+            const now = new Date();
+            const diffMinutes = Math.round((now - start) / (1000 * 60));
+            
+            if (diffMinutes < 60) return `${diffMinutes}m`;
+            
+            const hours = Math.floor(diffMinutes / 60);
+            const minutes = diffMinutes % 60;
+            return `${hours}h ${minutes}m`;
         }
 
-        exportPDF() {
-            this.showToast('PDF export feature coming soon!', 'warning');
-        }
-
-        shareScorecard() {
-            if (navigator.share) {
-                navigator.share({
-                    title: 'Mini Golf Scorecard',
-                    text: 'Check out my mini golf scorecard!',
-                    url: window.location.href
-                });
-            } else {
-                this.showToast('Scorecard link copied!', 'success');
+        // ===== AUTO SAVE =====
+        async autoSaveGame() {
+            if (this.currentGame) {
+                const gameData = {
+                    ...this.currentGame,
+                    players: this.players,
+                    scores: this.scores,
+                    currentHole: this.currentHole,
+                    totalHoles: this.totalHoles,
+                    status: this.gameComplete ? 'completed' : 'in-progress'
+                };
+                
+                const result = await this.saveGame(gameData);
+                if (result.success) {
+                    this.currentGame = result.game;
+                }
             }
         }
 
-        newGame() {
-            this.hideGameComplete();
-            this.showPlayerSetup();
+        // ===== MODALS AND UI =====
+        showGameActions(gameId) {
+            this.selectedGameId = gameId;
+            const modal = document.getElementById('game-actions-modal');
+            if (modal) modal.classList.remove('hidden');
         }
 
-        hideGameComplete() {
-            const modal = document.getElementById('game-complete-modal');
+        hideModal(modalId) {
+            const modal = document.getElementById(modalId);
             if (modal) modal.classList.add('hidden');
         }
 
-        closeAllModals() {
-            const modals = document.querySelectorAll('.modal');
-            modals.forEach(modal => modal.classList.add('hidden'));
+        showToast(message, type = 'success', duration = 3000) {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+            
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            
+            const icons = {
+                success: '✅',
+                error: '❌',
+                warning: '⚠️',
+                info: 'ℹ️'
+            };
+            
+            toast.innerHTML = `
+                <div class="toast-icon">${icons[type] || icons.info}</div>
+                <div class="toast-message">${message}</div>
+            `;
+            
+            container.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, duration);
         }
 
-        startPeriodicUpdates() {
-            setInterval(() => {
-                if (this.currentUser && document.getElementById('dashboard-screen')?.classList.contains('active')) {
-                    this.updateDashboardStats();
+        showLoading(message = 'Loading...') {
+            const overlay = document.getElementById('loading-overlay');
+            const loadingText = document.getElementById('loading-text');
+            
+            if (overlay) overlay.classList.remove('hidden');
+            if (loadingText) loadingText.textContent = message;
+        }
+
+        hideLoading() {
+            const overlay = document.getElementById('loading-overlay');
+            if (overlay) overlay.classList.add('hidden');
+        }
+
+        setupToastContainer() {
+            if (!document.getElementById('toast-container')) {
+                const container = document.createElement('div');
+                container.id = 'toast-container';
+                container.className = 'toast-container';
+                document.body.appendChild(container);
+            }
+        }
+
+        // ===== TAB MANAGEMENT =====
+        showScoreTab() {
+            this.switchTab('score-tab', 'score-content');
+        }
+
+        showLeaderboardTab() {
+            this.switchTab('leaderboard-tab', 'leaderboard-content');
+            this.updateLeaderboard();
+        }
+
+        showScorecardTab() {
+            this.switchTab('scorecard-tab', 'scorecard-content');
+            this.updateScorecard();
+        }
+
+        switchTab(activeTabId, activeContentId) {
+            // Update tabs
+            document.querySelectorAll('.game-tab').forEach(tab => tab.classList.remove('active'));
+            document.getElementById(activeTabId)?.classList.add('active');
+            
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(content => content.classList.remove('active'));
+            document.getElementById(activeContentId)?.classList.add('active');
+        }
+
+        // ===== UTILITY FUNCTIONS =====
+        hexToRgb(hex) {
+            const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+            return result ? 
+                `${parseInt(result[1], 16)}, ${parseInt(result[2], 16)}, ${parseInt(result[3], 16)}` : 
+                '0, 0, 0';
+        }
+
+        // ===== EVENT LISTENERS =====
+        setupEventListeners() {
+            this.setupAuthListeners();
+            this.setupDashboardListeners();
+            this.setupGameListeners();
+            this.setupModalListeners();
+        }
+
+        setupAuthListeners() {
+            // Phone input formatting
+            const phoneInput = document.getElementById('phone-input');
+            const countryCode = document.getElementById('country-code');
+            const sendSMSBtn = document.getElementById('send-sms-btn');
+            
+            if (phoneInput && countryCode) {
+                phoneInput.addEventListener('input', (e) => {
+                    const formatted = this.formatPhoneNumber(e.target.value, countryCode.value);
+                    e.target.value = formatted;
+                });
+            }
+            
+            if (sendSMSBtn) {
+                sendSMSBtn.addEventListener('click', () => this.handleSendSMS());
+            }
+            
+            // SMS verification
+            this.setupSMSCodeInputs();
+            
+            const verifySMSBtn = document.getElementById('verify-sms-btn');
+            if (verifySMSBtn) {
+                verifySMSBtn.addEventListener('click', () => this.handleVerifySMS());
+            }
+            
+            const backToPhone = document.getElementById('back-to-phone');
+            if (backToPhone) {
+                backToPhone.addEventListener('click', () => this.showLoginScreen());
+            }
+            
+            const resendCodeBtn = document.getElementById('resend-code-btn');
+            if (resendCodeBtn) {
+                resendCodeBtn.addEventListener('click', () => this.handleResendCode());
+            }
+        }
+
+        setupSMSCodeInputs() {
+            for (let i = 1; i <= 6; i++) {
+                const input = document.getElementById(`code-${i}`);
+                if (input) {
+                    input.addEventListener('input', (e) => this.handleCodeInput(e, i));
+                    input.addEventListener('keydown', (e) => this.handleCodeKeydown(e, i));
+                    input.addEventListener('paste', (e) => this.handleCodePaste(e));
                 }
-            }, 30000);
+            }
         }
 
-        handleError(error, context = 'Unknown') {
-            console.error(`Error in ${context}:`, error);
-            this.showToast(`Error in ${context}. Please try again.`, 'error');
+        handleCodeInput(e, position) {
+            const value = e.target.value;
+            
+            if (value.length > 0) {
+                e.target.classList.add('filled');
+                
+                // Move to next input
+                if (position < 6) {
+                    const nextInput = document.getElementById(`code-${position + 1}`);
+                    if (nextInput) nextInput.focus();
+                }
+                
+                // Check if all inputs are filled
+                this.checkSMSCodeComplete();
+            } else {
+                e.target.classList.remove('filled');
+            }
+        }
+
+        handleCodeKeydown(e, position) {
+            if (e.key === 'Backspace' && e.target.value === '' && position > 1) {
+                const prevInput = document.getElementById(`code-${position - 1}`);
+                if (prevInput) {
+                    prevInput.focus();
+                    prevInput.value = '';
+                    prevInput.classList.remove('filled');
+                }
+            }
+        }
+
+        handleCodePaste(e) {
+            e.preventDefault();
+            const paste = (e.clipboardData || window.clipboardData).getData('text');
+            const digits = paste.replace(/\D/g, '').slice(0, 6);
+            
+            for (let i = 0; i < 6; i++) {
+                const input = document.getElementById(`code-${i + 1}`);
+                if (input) {
+                    input.value = digits[i] || '';
+                    if (digits[i]) {
+                        input.classList.add('filled');
+                    } else {
+                        input.classList.remove('filled');
+                    }
+                }
+            }
+            
+            this.checkSMSCodeComplete();
+        }
+
+        checkSMSCodeComplete() {
+            const code = this.getSMSCode();
+            if (code.length === 6) {
+                setTimeout(() => this.handleVerifySMS(), 500);
+            }
+        }
+
+        getSMSCode() {
+            let code = '';
+            for (let i = 1; i <= 6; i++) {
+                const input = document.getElementById(`code-${i}`);
+                if (input) code += input.value;
+            }
+            return code;
+        }
+
+        setupDashboardListeners() {
+            const newGameFAB = document.getElementById('new-game-fab');
+            if (newGameFAB) {
+                newGameFAB.addEventListener('click', () => this.showPlayerSetup());
+            }
+            
+            const quick9Btn = document.getElementById('quick-9-btn');
+            if (quick9Btn) {
+                quick9Btn.addEventListener('click', () => this.createQuickGame(9));
+            }
+            
+            const quick18Btn = document.getElementById('quick-18-btn');
+            if (quick18Btn) {
+                quick18Btn.addEventListener('click', () => this.createQuickGame(18));
+            }
+            
+            const profileMenuBtn = document.getElementById('profile-menu-btn');
+            if (profileMenuBtn) {
+                profileMenuBtn.addEventListener('click', () => this.showModal('profile-modal'));
+            }
+            
+            const gamesSearch = document.getElementById('games-search');
+            if (gamesSearch) {
+                gamesSearch.addEventListener('input', () => this.filterGames());
+            }
+            
+            const gamesFilter = document.getElementById('games-filter');
+            if (gamesFilter) {
+                gamesFilter.addEventListener('change', () => this.filterGames());
+            }
+        }
+
+        setupGameListeners() {
+            // Setup screen listeners
+            const backToDashboard = document.getElementById('back-to-dashboard');
+            if (backToDashboard) {
+                backToDashboard.addEventListener('click', () => this.showDashboard());
+            }
+            
+            const decreasePlayersBtn = document.getElementById('decrease-players');
+            if (decreasePlayersBtn) {
+                decreasePlayersBtn.addEventListener('click', () => this.changePlayerCount(-1));
+            }
+            
+            const increasePlayersBtn = document.getElementById('increase-players');
+            if (increasePlayersBtn) {
+                increasePlayersBtn.addEventListener('click', () => this.changePlayerCount(1));
+            }
+            
+            const courseType = document.getElementById('course-type');
+            if (courseType) {
+                courseType.addEventListener('change', () => this.handleCourseTypeChange());
+            }
+            
+            const startNewGameBtn = document.getElementById('start-new-game');
+            if (startNewGameBtn) {
+                startNewGameBtn.addEventListener('click', () => this.startNewGame());
+            }
+            
+            // Game screen listeners
+            const scoreTab = document.getElementById('score-tab');
+            const leaderboardTab = document.getElementById('leaderboard-tab');
+            const scorecardTab = document.getElementById('scorecard-tab');
+            
+            if (scoreTab) scoreTab.addEventListener('click', () => this.showScoreTab());
+            if (leaderboardTab) leaderboardTab.addEventListener('click', () => this.showLeaderboardTab());
+            if (scorecardTab) scorecardTab.addEventListener('click', () => this.showScorecardTab());
+            
+            const prevHoleBtn = document.getElementById('prev-hole-btn');
+            const nextHoleBtn = document.getElementById('next-hole-btn');
+            const holeSelector = document.getElementById('hole-selector');
+            
+            if (prevHoleBtn) prevHoleBtn.addEventListener('click', () => this.previousHole());
+            if (nextHoleBtn) nextHoleBtn.addEventListener('click', () => this.nextHole());
+            if (holeSelector) {
+                holeSelector.addEventListener('change', (e) => this.jumpToHole(e.target.value));
+            }
+            
+            const gameMenuBtn = document.getElementById('game-menu-btn');
+            if (gameMenuBtn) {
+                gameMenuBtn.addEventListener('click', () => this.showModal('game-menu-modal'));
+            }
+        }
+
+        setupModalListeners() {
+            // Close buttons
+            const closeButtons = document.querySelectorAll('[id^="close-"]');
+            closeButtons.forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    const buttonId = e.target.id;
+                    if (buttonId === 'close-config-notice') {
+                        this.hideModal('config-notice');
+                        return;
+                    }
+                    
+                    const modalId = buttonId.replace('close-', '') + '-modal';
+                    this.hideModal(modalId);
+                });
+            });
+            
+            // Game actions
+            const continueGame = document.getElementById('continue-selected-game');
+            if (continueGame) {
+                continueGame.addEventListener('click', () => this.continueSelectedGame());
+            }
+            
+            const editGame = document.getElementById('edit-selected-game');
+            if (editGame) {
+                editGame.addEventListener('click', () => this.editSelectedGame());
+            }
+            
+            const duplicateGame = document.getElementById('duplicate-game');
+            if (duplicateGame) {
+                duplicateGame.addEventListener('click', () => this.duplicateSelectedGame());
+            }
+            
+            const deleteGame = document.getElementById('delete-selected-game');
+            if (deleteGame) {
+                deleteGame.addEventListener('click', () => this.deleteSelectedGame());
+            }
+            
+            // Profile actions
+            const logoutBtn = document.getElementById('logout-btn');
+            if (logoutBtn) {
+                logoutBtn.addEventListener('click', () => this.handleLogout());
+            }
+            
+            // Game menu actions
+            const saveAndExit = document.getElementById('save-and-exit');
+            if (saveAndExit) {
+                saveAndExit.addEventListener('click', () => this.saveAndExitGame());
+            }
+            
+            // Game complete actions
+            const saveGameBtn = document.getElementById('save-game-btn');
+            const newGameBtn = document.getElementById('new-game-btn');
+            
+            if (saveGameBtn) {
+                saveGameBtn.addEventListener('click', () => this.saveCompletedGame());
+            }
+            
+            if (newGameBtn) {
+                newGameBtn.addEventListener('click', () => this.startNewGameFromComplete());
+            }
+        }
+
+        // ===== EVENT HANDLERS =====
+        async handleSendSMS() {
+            const phoneInput = document.getElementById('phone-input');
+            const countryCode = document.getElementById('country-code');
+            
+            const phone = phoneInput?.value?.trim();
+            const code = countryCode?.value || '+1';
+            
+            if (!phone) {
+                this.showToast('Please enter a phone number', 'error');
+                return;
+            }
+            
+            const fullPhone = `${code} ${phone}`;
+            
+            // Set button loading state
+            this.setButtonLoading('send-sms-btn', true);
+            
+            try {
+                const result = await this.sendSMSCode(fullPhone);
+                if (result.success) {
+                    this.setButtonLoading('send-sms-btn', false);
+                    this.switchScreen('verification-screen');
+                    const smsMessage = document.getElementById('sms-message');
+                    if (smsMessage) {
+                        smsMessage.textContent = `Enter the 6-digit code sent to ${fullPhone}`;
+                    }
+                    
+                    // Focus first code input
+                    const firstInput = document.getElementById('code-1');
+                    if (firstInput) firstInput.focus();
+                    
+                    this.startResendTimer();
+                } else {
+                    this.setButtonLoading('send-sms-btn', false);
+                    this.showToast(result.message || 'Failed to send SMS', 'error');
+                }
+            } catch (error) {
+                this.setButtonLoading('send-sms-btn', false);
+                this.showToast('Failed to send SMS. Please try again.', 'error');
+            }
+        }
+
+        async handleVerifySMS() {
+            const code = this.getSMSCode();
+            
+            if (code.length !== 6) {
+                this.showToast('Please enter a 6-digit code', 'error');
+                return;
+            }
+            
+            const phoneInput = document.getElementById('phone-input');
+            const countryCode = document.getElementById('country-code');
+            const fullPhone = `${countryCode?.value || '+1'} ${phoneInput?.value?.trim()}`;
+            
+            // Set button loading state
+            this.setButtonLoading('verify-sms-btn', true);
+            
+            try {
+                const result = await this.verifySMSCode(fullPhone, code);
+                this.setButtonLoading('verify-sms-btn', false);
+                
+                if (result.success) {
+                    this.showToast('Successfully signed in!', 'success');
+                    await this.loadSavedGames();
+                    this.showDashboard();
+                } else {
+                    this.showToast(result.message, 'error');
+                    this.clearSMSCode();
+                }
+            } catch (error) {
+                this.setButtonLoading('verify-sms-btn', false);
+                this.showToast('Verification failed. Please try again.', 'error');
+            }
+        }
+
+        handleResendCode() {
+            this.handleSendSMS();
+        }
+
+        startResendTimer() {
+            this.resendCountdown = 30;
+            const resendBtn = document.getElementById('resend-code-btn');
+            const resendText = document.getElementById('resend-text');
+            const resendTimer = document.getElementById('resend-timer');
+            const timerCount = document.getElementById('timer-count');
+            
+            if (resendBtn) resendBtn.disabled = true;
+            if (resendText) resendText.classList.add('hidden');
+            if (resendTimer) resendTimer.classList.remove('hidden');
+            
+            this.resendTimer = setInterval(() => {
+                this.resendCountdown--;
+                if (timerCount) timerCount.textContent = this.resendCountdown;
+                
+                if (this.resendCountdown <= 0) {
+                    clearInterval(this.resendTimer);
+                    if (resendBtn) resendBtn.disabled = false;
+                    if (resendText) resendText.classList.remove('hidden');
+                    if (resendTimer) resendTimer.classList.add('hidden');
+                }
+            }, 1000);
+        }
+
+        clearSMSCode() {
+            for (let i = 1; i <= 6; i++) {
+                const input = document.getElementById(`code-${i}`);
+                if (input) {
+                    input.value = '';
+                    input.classList.remove('filled');
+                }
+            }
+            
+            const firstInput = document.getElementById('code-1');
+            if (firstInput) firstInput.focus();
+        }
+
+        async handleLogout() {
+            if (isSupabaseConfigured) {
+                try {
+                    await supabase.auth.signOut();
+                } catch (error) {
+                    console.error('Logout error:', error);
+                }
+            }
+            
+            // Clear local state regardless
+            this.currentUser = null;
+            this.savedGames = [];
+            this.currentGame = null;
+            
+            try {
+                localStorage.removeItem('miniGolfProData');
+            } catch (error) {
+                console.warn('Could not clear localStorage');
+            }
+            
+            this.hideModal('profile-modal');
+            this.showLoginScreen();
+            this.showToast('Signed out successfully', 'success');
+        }
+
+        changePlayerCount(delta) {
+            const newCount = this.playerCount + delta;
+            if (newCount >= 1 && newCount <= this.config.maxPlayers) {
+                this.playerCount = newCount;
+                this.updatePlayerCountDisplay();
+                this.generatePlayerInputs();
+            }
+        }
+
+        handleCourseTypeChange() {
+            const courseType = document.getElementById('course-type');
+            const customHolesGroup = document.getElementById('custom-holes-group');
+            
+            if (courseType?.value === 'custom') {
+                customHolesGroup?.classList.remove('hidden');
+            } else {
+                customHolesGroup?.classList.add('hidden');
+            }
+        }
+
+        createQuickGame(holes) {
+            // Create a quick game with default players
+            const quickGame = {
+                name: `Quick ${holes}-Hole Game`,
+                players: [
+                    { name: 'Player 1', color: this.config.playerColors[0] },
+                    { name: 'Player 2', color: this.config.playerColors[1] }
+                ],
+                totalHoles: holes,
+                currentHole: 1,
+                scores: { 0: {}, 1: {} },
+                status: 'in-progress'
+            };
+            
+            this.showPlayerSetup(quickGame);
+        }
+
+        continueSelectedGame() {
+            const game = this.savedGames.find(g => g.id === this.selectedGameId);
+            if (game) {
+                this.currentGame = game;
+                this.players = game.players;
+                this.scores = game.scores;
+                this.currentHole = game.currentHole;
+                this.totalHoles = game.totalHoles || 18;
+                this.gameComplete = game.status === 'completed';
+                
+                this.hideModal('game-actions-modal');
+                this.showGameScreen();
+            }
+        }
+
+        editSelectedGame() {
+            const game = this.savedGames.find(g => g.id === this.selectedGameId);
+            if (game) {
+                this.hideModal('game-actions-modal');
+                this.showPlayerSetup(game);
+            }
+        }
+
+        duplicateSelectedGame() {
+            this.duplicateGame(this.selectedGameId);
+            this.hideModal('game-actions-modal');
+        }
+
+        async deleteSelectedGame() {
+            if (confirm('Are you sure you want to delete this game? This action cannot be undone.')) {
+                await this.deleteGame(this.selectedGameId);
+                this.hideModal('game-actions-modal');
+                this.renderGames();
+            }
+        }
+
+        async saveAndExitGame() {
+            await this.autoSaveGame();
+            this.hideModal('game-menu-modal');
+            this.showDashboard();
+            this.showToast('Game saved successfully!', 'success');
+        }
+
+        async saveCompletedGame() {
+            if (this.currentGame) {
+                this.currentGame.status = 'completed';
+                await this.autoSaveGame();
+            }
+            this.hideModal('game-complete-modal');
+            this.showDashboard();
+            this.showToast('Game completed and saved!', 'success');
+        }
+
+        startNewGameFromComplete() {
+            this.hideModal('game-complete-modal');
+            this.showPlayerSetup();
+        }
+
+        showModal(modalId) {
+            const modal = document.getElementById(modalId);
+            if (modal) modal.classList.remove('hidden');
+        }
+
+        filterGames() {
+            // Implementation for filtering games would go here
+            // For now, just re-render all games
+            this.renderGames();
         }
     }
 
-    // Initialize the app
-    window.miniGolfPro = new MiniGolfPro();
-    
-    // Global error handling
-    window.addEventListener('error', (event) => {
-        window.miniGolfPro?.handleError(event.error, 'Global');
-    });
-    
-    window.addEventListener('unhandledrejection', (event) => {
-        window.miniGolfPro?.handleError(event.reason, 'Promise');
-    });
+    // Initialize the application
+    window.gameApp = new MiniGolfPro();
 });
+
+// PWA Service Worker Registration
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').then(registration => {
+            console.log('SW registered: ', registration);
+        }).catch(registrationError => {
+            console.log('SW registration failed: ', registrationError);
+        });
+    });
+}
