@@ -828,66 +828,81 @@ select.form-control {
     font-size: var(--font-size-md);
 }
 
-/* Enhanced Phone Input */
-.phone-input-group {
-    display: flex;
-    gap: var(--space-12);
-    margin-bottom: var(--space-24);
+/* Enhanced Email Input */
+/* ========== EMAIL-ONLY AUTH PANEL ========== */
+
+.auth-card {
+  background: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-32);
+  border: 1px solid var(--color-card-border);
+  box-shadow: var(--shadow-lg);
+  position: relative;
+  overflow: hidden;
+}
+.auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, var(--color-primary), var(--color-teal-400));
+}
+.auth-card h2 {
+  text-align: center;
+  margin-bottom: var(--space-8);
+  color: var(--color-text);
+}
+.auth-subtitle {
+  text-align: center;
+  color: var(--color-text-secondary);
+  margin-bottom: var(--space-24);
+  font-size: var(--font-size-md);
+}
+.form-control {
+  display: block;
+  width: 100%;
+  padding: var(--space-8) var(--space-12);
+  font-size: var(--font-size-md);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-base);
+  background: var(--color-surface);
+  margin-bottom: var(--space-16);
+}
+.form-control:focus {
+  border-color: var(--color-primary);
+  outline: var(--focus-outline);
+}
+.btn {
+  width: 100%;
+  padding: var(--space-12) var(--space-16);
+  border: none;
+  border-radius: var(--radius-base);
+  background: var(--color-primary);
+  color: var(--color-btn-primary-text);
+  font-size: var(--font-size-lg);
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: var(--space-8);
+}
+.auth-message {
+  text-align: center;
+  margin-top: var(--space-16);
+  font-size: var(--font-size-sm);
 }
 
-.country-selector {
-    min-width: 100px;
+/* Hide any phone, SMS, or code sections completely */
+.phone-input-group,
+.country-selector,
+.phone-input-wrapper,
+.phone-input,
+.sms-code-input,
+.code-digit,
+.verification-icon,
+.resend-section {
+  display: none !important;
 }
 
-.country-select {
-    font-size: var(--font-size-base);
-    padding: var(--space-12) var(--space-8);
-}
-
-.phone-input-wrapper {
-    flex: 1;
-}
-
-.phone-input {
-    font-size: var(--font-size-lg);
-    padding: var(--space-16);
-    font-weight: var(--font-weight-medium);
-    letter-spacing: 0.02em;
-}
-
-/* SMS Code Input */
-.sms-code-input {
-    display: flex;
-    justify-content: center;
-    gap: var(--space-12);
-    margin-bottom: var(--space-32);
-}
-
-.code-digit {
-    width: 48px;
-    height: 56px;
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-bold);
-    text-align: center;
-    border: 2px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--color-surface);
-    color: var(--color-text);
-    transition: all var(--duration-fast) var(--ease-standard);
-}
-
-.code-digit:focus {
-    border-color: var(--color-primary);
-    background: var(--color-bg-1);
-    transform: scale(1.05);
-    box-shadow: 0 0 0 3px var(--color-focus-ring);
-}
-
-.code-digit.filled {
-    background: var(--color-primary);
-    color: var(--color-btn-primary-text);
-    border-color: var(--color-primary);
-}
 
 /* Enhanced Buttons */
 .btn {
