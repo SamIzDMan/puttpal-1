@@ -5,300 +5,352 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Mini Golf Pro - Score Tracker</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Supabase JavaScript Client -->
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    <meta name="theme-color" content="#21808D">
+    
+    <!-- App Icons -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏌️‍♂️</text></svg>">
 </head>
 <body>
     <div class="app-container">
         
-        <!-- Modern Landing Screen -->
+        <!-- Enhanced Phone Authentication Screen -->
         <div id="login-screen" class="screen active">
-            <div class="glass-card auth-container">
-                <div class="hero-section">
-                    <div class="app-icon">⛳</div>
-                    <h1 class="hero-title">Mini Golf Pro</h1>
-                    <p class="hero-subtitle">Track, save, and analyze your mini golf games with style</p>
+            <div class="auth-header">
+                <div class="app-logo">🏌️‍♂️</div>
+                <h1>Mini Golf Pro</h1>
+                <p>Professional score tracking made simple</p>
+            </div>
+            
+            <div class="auth-card">
+                <h2>Welcome Back</h2>
+                <p class="auth-subtitle">Enter your phone number to continue</p>
+                
+                <div class="phone-input-group">
+                    <div class="country-selector">
+                        <select id="country-code" class="form-control country-select">
+                            <option value="+1" data-flag="🇺🇸">🇺🇸 +1</option>
+                            <option value="+44" data-flag="🇬🇧">🇬🇧 +44</option>
+                            <option value="+49" data-flag="🇩🇪">🇩🇪 +49</option>
+                            <option value="+33" data-flag="🇫🇷">🇫🇷 +33</option>
+                            <option value="+39" data-flag="🇮🇹">🇮🇹 +39</option>
+                            <option value="+34" data-flag="🇪🇸">🇪🇸 +34</option>
+                            <option value="+31" data-flag="🇳🇱">🇳🇱 +31</option>
+                            <option value="+61" data-flag="🇦🇺">🇦🇺 +61</option>
+                        </select>
+                    </div>
+                    <div class="phone-input-wrapper">
+                        <input type="tel" id="phone-input" class="form-control phone-input" 
+                               placeholder="123 456 7890" maxlength="15">
+                    </div>
                 </div>
                 
-                <div class="auth-form">
-                    <div class="form-group">
-                        <label class="form-label">Phone Number</label>
-                        <div class="phone-input-group">
-                            <select id="country-code" class="country-select">
-                                <option value="+1">🇺🇸 +1</option>
-                                <option value="+44">🇬🇧 +44</option>
-                                <option value="+33">🇫🇷 +33</option>
-                                <option value="+49">🇩🇪 +49</option>
-                                <option value="+81">🇯🇵 +81</option>
-                                <option value="+61">🇦🇺 +61</option>
-                            </select>
-                            <input type="tel" id="phone-input" class="form-control phone-input" placeholder="Enter phone number">
+                <button id="send-sms-btn" class="btn btn--primary btn--lg btn--full-width">
+                    <span class="btn-text">Send SMS Code</span>
+                    <div class="btn-loading hidden">
+                        <div class="loading-dots">
+                            <div></div>
+                            <div></div>
+                            <div></div>
                         </div>
                     </div>
-                    
-                    <button id="send-code-btn" class="btn btn--primary btn--lg btn--full-width">
-                        <span class="btn-text">Send OTP Code</span>
-                        <span class="btn-loader hidden">Sending...</span>
-                    </button>
-                    
-                    <div id="login-message" class="message hidden"></div>
-                    
-                    <div class="auth-footer">
-                        <p>Demo: Use any phone number, code is always <strong>123456</strong></p>
-                    </div>
+                </button>
+                
+                <div id="phone-message" class="message hidden"></div>
+                
+                <div class="auth-footer">
+                    <p>By continuing, you agree to our Terms of Service</p>
                 </div>
             </div>
         </div>
 
-        <!-- Modern Verification Screen -->
+        <!-- Enhanced SMS Verification Screen -->
         <div id="verification-screen" class="screen">
-            <div class="glass-card auth-container">
-                <div class="verification-header">
-                    <div class="verification-icon">🔐</div>
-                    <h1>Verify Phone</h1>
-                    <p id="verification-message">Enter the 6-digit code sent to your phone</p>
+            <div class="auth-header">
+                <div class="verification-icon">📱</div>
+                <h1>Verify Your Phone</h1>
+                <p id="sms-message">Enter the 6-digit code sent to your phone</p>
+            </div>
+            
+            <div class="auth-card">
+                <div class="sms-code-input">
+                    <input type="text" id="code-1" class="code-digit" maxlength="1">
+                    <input type="text" id="code-2" class="code-digit" maxlength="1">
+                    <input type="text" id="code-3" class="code-digit" maxlength="1">
+                    <input type="text" id="code-4" class="code-digit" maxlength="1">
+                    <input type="text" id="code-5" class="code-digit" maxlength="1">
+                    <input type="text" id="code-6" class="code-digit" maxlength="1">
                 </div>
                 
-                <div class="auth-form">
-                    <div class="otp-input-container">
-                        <input type="text" class="otp-digit" maxlength="1" data-index="0">
-                        <input type="text" class="otp-digit" maxlength="1" data-index="1">
-                        <input type="text" class="otp-digit" maxlength="1" data-index="2">
-                        <input type="text" class="otp-digit" maxlength="1" data-index="3">
-                        <input type="text" class="otp-digit" maxlength="1" data-index="4">
-                        <input type="text" class="otp-digit" maxlength="1" data-index="5">
+                <button id="verify-sms-btn" class="btn btn--primary btn--lg btn--full-width">
+                    <span class="btn-text">Verify & Continue</span>
+                    <div class="btn-loading hidden">
+                        <div class="loading-spinner"></div>
                     </div>
-                    
-                    <button id="verify-code-btn" class="btn btn--primary btn--lg btn--full-width">
-                        <span class="btn-text">Verify & Continue</span>
-                        <span class="btn-loader hidden">Verifying...</span>
+                </button>
+                
+                <div class="resend-section">
+                    <p>Didn't receive the code?</p>
+                    <button id="resend-code-btn" class="btn btn--outline">
+                        <span id="resend-text">Resend Code</span>
+                        <span id="resend-timer" class="hidden">Resend in <span id="timer-count">30</span>s</span>
                     </button>
-                    
-                    <button id="back-to-login" class="btn btn--ghost">← Back to Login</button>
-                    
-                    <div id="verification-error" class="message hidden"></div>
-                    
-                    <div class="resend-section">
-                        <p>Didn't receive code? <button id="resend-code" class="link-btn">Resend</button></p>
-                    </div>
                 </div>
+                
+                <button id="back-to-phone" class="btn btn--text">← Change Phone Number</button>
+                
+                <div id="sms-error" class="message hidden"></div>
             </div>
         </div>
 
-        <!-- Modern Dashboard Screen -->
+        <!-- Enhanced Dashboard Screen -->
         <div id="dashboard-screen" class="screen">
             <div class="dashboard-header">
-                <div class="user-welcome">
-                    <div class="user-avatar">👤</div>
-                    <div class="welcome-text">
+                <div class="user-profile">
+                    <div class="profile-avatar">
+                        <span id="user-initials">U</span>
+                    </div>
+                    <div class="profile-info">
                         <h2>Welcome back!</h2>
-                        <p id="user-display">Player</p>
+                        <p id="user-phone">+1 555 123 4567</p>
                     </div>
                 </div>
-                <button id="logout-btn" class="btn btn--ghost btn--sm">
-                    <span>🚪</span>
-                    Logout
+                <div class="header-actions">
+                    <button id="profile-menu-btn" class="btn btn--ghost btn--icon">⚙️</button>
+                </div>
+            </div>
+
+            <!-- Quick Stats -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-number" id="total-games">0</div>
+                    <div class="stat-label">Games Played</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="avg-score">-</div>
+                    <div class="stat-label">Avg Score</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-number" id="best-score">-</div>
+                    <div class="stat-label">Best Round</div>
+                </div>
+            </div>
+            
+            <!-- Game Actions -->
+            <div class="action-buttons">
+                <button id="new-game-fab" class="btn btn--primary btn--lg fab-button">
+                    <span class="fab-icon">🆕</span>
+                    <span class="fab-text">New Game</span>
                 </button>
-            </div>
-            
-            <div class="dashboard-stats">
-                <div class="stat-card glass-card">
-                    <div class="stat-icon">🏆</div>
-                    <div class="stat-content">
-                        <div class="stat-number" id="games-completed">0</div>
-                        <div class="stat-label">Games Completed</div>
-                    </div>
-                </div>
-                <div class="stat-card glass-card">
-                    <div class="stat-icon">⏳</div>
-                    <div class="stat-content">
-                        <div class="stat-number" id="games-in-progress">0</div>
-                        <div class="stat-label">In Progress</div>
-                    </div>
-                </div>
-                <div class="stat-card glass-card">
-                    <div class="stat-icon">🎯</div>
-                    <div class="stat-content">
-                        <div class="stat-number" id="best-score">--</div>
-                        <div class="stat-label">Best Score</div>
-                    </div>
+                
+                <div class="quick-actions">
+                    <button id="quick-9-btn" class="btn btn--outline quick-action">Quick 9</button>
+                    <button id="quick-18-btn" class="btn btn--outline quick-action">Full 18</button>
+                    <button id="tournament-btn" class="btn btn--outline quick-action">Tournament</button>
                 </div>
             </div>
             
-            <div class="dashboard-actions">
-                <button id="new-game-btn" class="btn btn--primary btn--lg btn--full-width">
-                    <span class="btn-icon">🆕</span>
-                    Start New Game
-                </button>
-            </div>
-            
-            <div class="saved-games glass-card">
+            <!-- Games List -->
+            <div class="games-section">
                 <div class="section-header">
-                    <h3>Your Games</h3>
-                    <div class="game-filters">
-                        <button class="filter-btn active" data-filter="all">All</button>
-                        <button class="filter-btn" data-filter="in-progress">In Progress</button>
-                        <button class="filter-btn" data-filter="completed">Completed</button>
+                    <h3>Recent Games</h3>
+                    <div class="games-filter">
+                        <input type="search" id="games-search" class="form-control search-input" 
+                               placeholder="Search games...">
+                        <select id="games-filter" class="form-control filter-select">
+                            <option value="all">All Games</option>
+                            <option value="in-progress">In Progress</option>
+                            <option value="completed">Completed</option>
+                        </select>
                     </div>
                 </div>
-                <div id="games-list" class="games-grid">
+                
+                <div id="games-container" class="games-grid">
                     <!-- Games will be populated here -->
+                </div>
+                
+                <div id="empty-games" class="empty-state hidden">
+                    <div class="empty-icon">🏌️</div>
+                    <h3>No games yet</h3>
+                    <p>Start your first game to begin tracking scores</p>
+                    <button class="btn btn--primary" onclick="document.getElementById('new-game-fab').click()">
+                        Start Your First Game
+                    </button>
                 </div>
             </div>
         </div>
 
-        <!-- Enhanced Player Setup Screen -->
+        <!-- Enhanced Game Setup Screen -->
         <div id="setup-screen" class="screen">
             <div class="setup-header">
-                <button id="back-to-dashboard" class="btn btn--ghost">← Back</button>
-                <div class="header-content">
-                    <h1>⚙️ Game Setup</h1>
+                <button id="back-to-dashboard" class="btn btn--ghost btn--icon">←</button>
+                <div class="setup-title">
+                    <h1 id="setup-title-text">New Game Setup</h1>
                     <p>Configure players and settings</p>
                 </div>
+                <button id="save-template-btn" class="btn btn--outline btn--sm hidden">Save Template</button>
             </div>
             
             <div class="setup-content">
-                <div class="glass-card setup-section">
+                <div class="setup-card">
                     <h3>Game Settings</h3>
-                    <div class="form-row">
+                    <div class="setup-grid">
                         <div class="form-group">
-                            <label class="form-label">Number of Players</label>
-                            <select id="player-count" class="form-control">
-                                <option value="1">1 Player</option>
-                                <option value="2" selected>2 Players</option>
-                                <option value="3">3 Players</option>
-                                <option value="4">4 Players</option>
-                                <option value="5">5 Players</option>
-                                <option value="6">6 Players</option>
-                                <option value="7">7 Players</option>
-                                <option value="8">8 Players</option>
-                                <option value="9">9 Players</option>
-                                <option value="10">10 Players</option>
-                            </select>
+                            <label class="form-label">Game Name</label>
+                            <input type="text" id="game-name-input" class="form-control" 
+                                   placeholder="Enter game name">
                         </div>
                         <div class="form-group">
-                            <label class="form-label">Total Holes</label>
-                            <select id="total-holes" class="form-control">
-                                <option value="9">9 Holes</option>
-                                <option value="18" selected>18 Holes</option>
+                            <label class="form-label">Course Type</label>
+                            <select id="course-type" class="form-control">
+                                <option value="18">18 Holes (Standard)</option>
+                                <option value="9">9 Holes (Quick)</option>
+                                <option value="custom">Custom</option>
                             </select>
+                        </div>
+                        <div class="form-group hidden" id="custom-holes-group">
+                            <label class="form-label">Number of Holes</label>
+                            <input type="number" id="custom-holes" class="form-control" 
+                                   min="1" max="36" placeholder="Number of holes">
                         </div>
                     </div>
                 </div>
-                
-                <div class="glass-card setup-section">
-                    <h3>Players</h3>
-                    <div id="player-names" class="players-grid">
-                        <!-- Player setup inputs will be generated here -->
+
+                <div class="setup-card">
+                    <div class="players-header">
+                        <h3>Players</h3>
+                        <div class="player-counter">
+                            <button id="decrease-players" class="btn btn--ghost btn--sm counter-btn">−</button>
+                            <span id="player-count-display">2 Players</span>
+                            <button id="increase-players" class="btn btn--ghost btn--sm counter-btn">+</button>
+                        </div>
+                    </div>
+                    
+                    <div id="players-container" class="players-list">
+                        <!-- Player inputs will be generated here -->
                     </div>
                 </div>
                 
                 <div class="setup-actions">
-                    <button id="start-game" class="btn btn--primary btn--lg btn--full-width">
-                        🎮 Start Game
+                    <button id="start-new-game" class="btn btn--primary btn--lg btn--full-width">
+                        <span class="btn-icon">🚀</span>
+                        <span class="btn-text">Start Game</span>
                     </button>
                 </div>
             </div>
         </div>
 
-        <!-- Modern Game Screen -->
+        <!-- Enhanced Game Screen -->
         <div id="game-screen" class="screen">
-            <div class="game-header glass-card">
-                <div class="game-status-bar">
-                    <button id="save-exit-btn" class="btn btn--ghost btn--sm">
-                        💾 Save & Exit
-                    </button>
-                    <div class="auto-save-indicator">
-                        <span class="save-dot"></span>
-                        Auto-saved
-                    </div>
-                </div>
-                
-                <div class="hole-info">
-                    <h2 id="hole-display">Hole 1 of 18</h2>
-                    <div class="progress-container">
-                        <div class="progress-bar">
-                            <div id="progress-fill" class="progress-fill"></div>
+            <div class="game-header">
+                <div class="game-nav">
+                    <button id="game-menu-btn" class="btn btn--ghost btn--icon">☰</button>
+                    <div class="game-info">
+                        <h2 id="game-title">Game in Progress</h2>
+                        <div class="hole-indicator">
+                            <span id="hole-number">Hole 1</span>
+                            <span class="hole-divider">of</span>
+                            <span id="total-holes">18</span>
                         </div>
-                        <span class="progress-text" id="progress-text">0%</span>
                     </div>
+                    <button id="game-settings-btn" class="btn btn--ghost btn--icon">⚙️</button>
                 </div>
                 
-                <!-- Top Hole Navigation -->
-                <div class="hole-navigation-top">
-                    <button id="prev-hole-top" class="nav-btn" disabled>
-                        <span>←</span>
-                    </button>
-                    <div class="hole-selector" id="hole-selector-top">
-                        <!-- Hole numbers will be generated here -->
+                <div class="progress-container">
+                    <div class="progress-bar">
+                        <div id="progress-indicator" class="progress-fill"></div>
                     </div>
-                    <button id="next-hole-top" class="nav-btn">
-                        <span>→</span>
-                    </button>
+                    <div class="progress-text">
+                        <span id="progress-percentage">0%</span>
+                        <span>Complete</span>
+                    </div>
                 </div>
             </div>
 
             <div class="game-tabs">
-                <button id="score-tab" class="tab-btn active">
-                    <span class="tab-icon">⛳</span>
-                    Score Entry
+                <button id="score-tab" class="game-tab active">
+                    <span class="tab-icon">📊</span>
+                    <span class="tab-text">Score Entry</span>
                 </button>
-                <button id="leaderboard-tab" class="tab-btn">
+                <button id="leaderboard-tab" class="game-tab">
                     <span class="tab-icon">🏆</span>
-                    Leaderboard
+                    <span class="tab-text">Leaderboard</span>
+                </button>
+                <button id="scorecard-tab" class="game-tab">
+                    <span class="tab-icon">📋</span>
+                    <span class="tab-text">Scorecard</span>
                 </button>
             </div>
 
             <!-- Score Entry Tab -->
             <div id="score-content" class="tab-content active">
-                <div class="score-entry glass-card">
-                    <div id="score-inputs" class="score-inputs-grid">
+                <div class="score-entry-container">
+                    <div id="score-players" class="score-players">
                         <!-- Score inputs will be generated here -->
                     </div>
                     
-                    <!-- Quick Score Buttons -->
-                    <div class="quick-score-section">
-                        <div class="quick-score-label">Quick Score</div>
-                        <div class="quick-score-buttons" id="quick-score-buttons">
-                            <button class="quick-btn" data-score="1">1</button>
-                            <button class="quick-btn" data-score="2">2</button>
-                            <button class="quick-btn" data-score="3">3</button>
-                            <button class="quick-btn" data-score="4">4</button>
-                            <button class="quick-btn" data-score="5">5</button>
-                            <button class="quick-btn" data-score="6">6</button>
-                        </div>
-                        <div class="selected-player-indicator" id="selected-player">
-                            Select a player to use quick scoring
+                    <div class="quick-scores">
+                        <div class="quick-scores-header">Quick Entry</div>
+                        <div class="quick-score-buttons" id="quick-scores">
+                            <button class="quick-score-btn" data-score="1">1</button>
+                            <button class="quick-score-btn" data-score="2">2</button>
+                            <button class="quick-score-btn" data-score="3">3</button>
+                            <button class="quick-score-btn" data-score="4">4</button>
+                            <button class="quick-score-btn" data-score="5">5+</button>
                         </div>
                     </div>
                 </div>
                 
-                <!-- Bottom Hole Navigation -->
-                <div class="hole-navigation-bottom glass-card">
-                    <button id="prev-hole" class="btn btn--outline btn--lg">
-                        <span>←</span> Previous
+                <div class="hole-navigation">
+                    <button id="prev-hole-btn" class="btn btn--outline nav-btn">
+                        <span class="btn-icon">←</span>
+                        <span class="btn-text">Previous</span>
                     </button>
-                    <div class="hole-selector-mini" id="hole-selector-bottom">
-                        <!-- Mini hole selector will be generated here -->
+                    <div class="hole-selector">
+                        <select id="hole-selector" class="form-control">
+                            <!-- Hole options will be populated -->
+                        </select>
                     </div>
-                    <button id="next-hole" class="btn btn--primary btn--lg">
-                        Next <span>→</span>
+                    <button id="next-hole-btn" class="btn btn--primary nav-btn">
+                        <span class="btn-text">Next</span>
+                        <span class="btn-icon">→</span>
                     </button>
                 </div>
             </div>
 
             <!-- Leaderboard Tab -->
             <div id="leaderboard-content" class="tab-content">
-                <div class="leaderboard glass-card">
+                <div class="leaderboard-container">
                     <div class="leaderboard-header">
                         <h3 id="leaderboard-title">Current Standings</h3>
-                        <button id="view-scorecard-btn" class="btn btn--ghost btn--sm">
-                            📊 Full Scorecard
-                        </button>
+                        <div class="leaderboard-filters">
+                            <button id="show-total" class="filter-btn active">Total</button>
+                            <button id="show-current-hole" class="filter-btn">This Hole</button>
+                        </div>
                     </div>
-                    <div id="leaderboard-list" class="leaderboard-grid">
-                        <!-- Leaderboard will be generated here -->
+                    <div id="leaderboard-list" class="leaderboard-list">
+                        <!-- Leaderboard items will be populated -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Scorecard Tab -->
+            <div id="scorecard-content" class="tab-content">
+                <div class="scorecard-container">
+                    <div class="scorecard-header">
+                        <h3>Full Scorecard</h3>
+                        <div class="scorecard-actions">
+                            <button id="export-scorecard" class="btn btn--outline btn--sm">Export</button>
+                            <button id="share-scorecard" class="btn btn--outline btn--sm">Share</button>
+                        </div>
+                    </div>
+                    <div id="scorecard-table" class="scorecard-table">
+                        <!-- Scorecard table will be populated -->
                     </div>
                 </div>
             </div>
@@ -306,64 +358,173 @@
 
         <!-- Game Complete Modal -->
         <div id="game-complete-modal" class="modal hidden">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content glass-card">
-                <div class="modal-header celebration">
+            <div class="modal-content celebration-modal">
+                <div class="celebration-header">
                     <div class="celebration-icon">🏆</div>
                     <h2>Game Complete!</h2>
-                    <p>Congratulations on finishing your round!</p>
+                    <p>Congratulations on finishing the round</p>
                 </div>
-                <div id="final-results" class="final-results">
-                    <!-- Final results will be shown here -->
+                
+                <div id="final-leaderboard" class="final-results">
+                    <!-- Final results will be populated -->
                 </div>
+                
+                <div class="celebration-stats" id="game-stats">
+                    <!-- Game statistics will be shown -->
+                </div>
+                
                 <div class="modal-actions">
-                    <button id="save-completed-game" class="btn btn--primary">💾 Save Game</button>
-                    <button id="new-game-modal" class="btn btn--secondary">🆕 New Game</button>
-                    <button id="view-scorecard" class="btn btn--ghost">📊 View Scorecard</button>
-                    <button id="share-game" class="btn btn--ghost">📤 Share Results</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Scorecard Modal -->
-        <div id="scorecard-modal" class="modal hidden">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content glass-card large-modal">
-                <div class="modal-header">
-                    <h3>📊 Full Scorecard</h3>
-                    <button id="close-scorecard" class="btn btn--ghost btn--sm">✕</button>
-                </div>
-                <div id="scorecard-table" class="scorecard-container">
-                    <!-- Scorecard table will be generated here -->
-                </div>
-                <div class="modal-actions">
-                    <button id="export-pdf" class="btn btn--secondary">📄 Export PDF</button>
-                    <button id="share-scorecard" class="btn btn--ghost">📤 Share</button>
+                    <button id="save-game-btn" class="btn btn--primary">Save Game</button>
+                    <button id="new-game-btn" class="btn btn--outline">New Game</button>
+                    <button id="share-results-btn" class="btn btn--outline">Share Results</button>
                 </div>
             </div>
         </div>
 
         <!-- Game Actions Modal -->
         <div id="game-actions-modal" class="modal hidden">
-            <div class="modal-backdrop"></div>
-            <div class="modal-content glass-card">
+            <div class="modal-content">
                 <div class="modal-header">
                     <h3>Game Options</h3>
-                    <button id="close-game-actions" class="btn btn--ghost btn--sm">✕</button>
+                    <button id="close-game-actions" class="btn btn--ghost btn--icon">×</button>
                 </div>
-                <div class="modal-actions vertical">
-                    <button id="continue-game" class="btn btn--primary btn--full-width">
-                        ▶️ Continue Game
+                
+                <div class="game-actions-grid">
+                    <button id="continue-selected-game" class="action-card">
+                        <div class="action-icon">▶️</div>
+                        <div class="action-text">
+                            <div class="action-title">Continue Game</div>
+                            <div class="action-subtitle">Resume playing</div>
+                        </div>
                     </button>
-                    <button id="edit-game" class="btn btn--secondary btn--full-width">
-                        ✏️ Edit Players
+                    
+                    <button id="edit-selected-game" class="action-card">
+                        <div class="action-icon">✏️</div>
+                        <div class="action-text">
+                            <div class="action-title">Edit Game</div>
+                            <div class="action-subtitle">Modify players & scores</div>
+                        </div>
                     </button>
-                    <button id="duplicate-game" class="btn btn--ghost btn--full-width">
-                        📄 Duplicate Setup
+                    
+                    <button id="duplicate-game" class="action-card">
+                        <div class="action-icon">📋</div>
+                        <div class="action-text">
+                            <div class="action-title">Duplicate</div>
+                            <div class="action-subtitle">Copy as template</div>
+                        </div>
                     </button>
-                    <button id="delete-game" class="btn btn--danger btn--full-width">
-                        🗑️ Delete Game
+                    
+                    <button id="rename-selected-game" class="action-card">
+                        <div class="action-icon">🏷️</div>
+                        <div class="action-text">
+                            <div class="action-title">Rename</div>
+                            <div class="action-subtitle">Change game name</div>
+                        </div>
                     </button>
+                    
+                    <button id="export-selected-game" class="action-card">
+                        <div class="action-icon">📤</div>
+                        <div class="action-text">
+                            <div class="action-title">Export</div>
+                            <div class="action-subtitle">Download scorecard</div>
+                        </div>
+                    </button>
+                    
+                    <button id="delete-selected-game" class="action-card danger">
+                        <div class="action-icon">🗑️</div>
+                        <div class="action-text">
+                            <div class="action-title">Delete</div>
+                            <div class="action-subtitle">Remove permanently</div>
+                        </div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Game Menu Modal -->
+        <div id="game-menu-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Game Menu</h3>
+                    <button id="close-game-menu" class="btn btn--ghost btn--icon">×</button>
+                </div>
+                
+                <div class="menu-options">
+                    <button id="save-and-exit" class="menu-option">
+                        <span class="option-icon">💾</span>
+                        <span class="option-text">Save & Exit</span>
+                    </button>
+                    <button id="edit-players-btn" class="menu-option">
+                        <span class="option-icon">👥</span>
+                        <span class="option-text">Edit Players</span>
+                    </button>
+                    <button id="reset-hole" class="menu-option">
+                        <span class="option-icon">🔄</span>
+                        <span class="option-text">Reset Current Hole</span>
+                    </button>
+                    <button id="game-settings" class="menu-option">
+                        <span class="option-icon">⚙️</span>
+                        <span class="option-text">Game Settings</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Player Edit Modal -->
+        <div id="player-edit-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Edit Players</h3>
+                    <button id="close-player-edit" class="btn btn--ghost btn--icon">×</button>
+                </div>
+                
+                <div id="edit-players-list" class="edit-players-container">
+                    <!-- Editable player list will be populated -->
+                </div>
+                
+                <div class="player-edit-actions">
+                    <button id="add-player-btn" class="btn btn--outline">
+                        <span class="btn-icon">+</span>
+                        <span class="btn-text">Add Player</span>
+                    </button>
+                    <button id="save-players-btn" class="btn btn--primary">Save Changes</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Profile Menu Modal -->
+        <div id="profile-modal" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Profile Settings</h3>
+                    <button id="close-profile" class="btn btn--ghost btn--icon">×</button>
+                </div>
+                
+                <div class="profile-options">
+                    <div class="profile-info">
+                        <div class="profile-avatar-large">
+                            <span id="profile-initials">U</span>
+                        </div>
+                        <div class="profile-details">
+                            <h4 id="profile-phone">+1 555 123 4567</h4>
+                            <p>Member since <span id="member-since">Today</span></p>
+                        </div>
+                    </div>
+                    
+                    <div class="settings-list">
+                        <button class="setting-option" id="export-all-data">
+                            <span class="setting-icon">📁</span>
+                            <span class="setting-text">Export All Data</span>
+                        </button>
+                        <button class="setting-option" id="clear-all-data">
+                            <span class="setting-icon">🗑️</span>
+                            <span class="setting-text">Clear All Data</span>
+                        </button>
+                        <button class="setting-option" id="logout-btn">
+                            <span class="setting-icon">🚪</span>
+                            <span class="setting-text">Sign Out</span>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
@@ -371,13 +532,37 @@
         <!-- Loading Overlay -->
         <div id="loading-overlay" class="loading-overlay hidden">
             <div class="loading-content">
-                <div class="loading-spinner"></div>
-                <p class="loading-text">Processing...</p>
+                <div class="loading-logo">🏌️‍♂️</div>
+                <div class="loading-spinner-large"></div>
+                <p id="loading-text">Loading...</p>
             </div>
         </div>
 
         <!-- Toast Notifications -->
-        <div id="toast-container" class="toast-container"></div>
+        <div id="toast-container" class="toast-container">
+            <!-- Toast notifications will appear here -->
+        </div>
+
+        <!-- Configuration Notice -->
+        <div id="config-notice" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>⚠️ Configuration Required</h3>
+                </div>
+                <div class="modal-body">
+                    <p>To use real Supabase authentication and database, you need to:</p>
+                    <ol>
+                        <li>Replace <code>SUPABASE_URL</code> with your project URL</li>
+                        <li>Replace <code>SUPABASE_ANON_KEY</code> with your public key</li>
+                        <li>Set up a <code>games</code> table in your Supabase database</li>
+                    </ol>
+                    <p>Until configured, the app will use demo mode with localStorage fallback.</p>
+                </div>
+                <div class="modal-actions">
+                    <button id="close-config-notice" class="btn btn--primary">Got it!</button>
+                </div>
+            </div>
+        </div>
 
     </div>
 
