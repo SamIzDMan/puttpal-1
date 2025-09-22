@@ -3,7 +3,9 @@
 // =============================================================================
 // Replace these with your actual Supabase project credentials
 const SUPABASE_URL = 'https://ygydcupxeobfhizzyouu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InlneWRjdXB4ZW9iZmhpenp5b3V1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgxNDQyMTgsImV4cCI6MjA3MzcyMDIxOH0.glYIchzgyqG3pXwekqUqotrymGOHlqrD5UhMxvLSwbs'; // Your anon/public key 
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoemJhYnBzY2lydnl6bGh1amVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwNjgzMTYsImV4cCI6MjA3MzY0NDMxNn0.dFXWzHY-5BbypW5pNbHPPX0uPpyCX9836vbJYknghT4'; // Your anon/public key 
+
+
 
 // Initialize Supabase client
 let supabase = null;
