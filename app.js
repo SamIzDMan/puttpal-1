@@ -2,8 +2,8 @@
 // SUPABASE CONFIGURATION
 // Replace these with your actual Supabase project details
 // ========================================
-const SUPABASE_URL = 'https://YOUR-PROJECT-ID.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...'; // Your anon/public key
+const SUPABASE_URL = 'https://ghzbabpscirvyzlhujeh.supabase.co';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdoemJhYnBzY2lydnl6bGh1amVoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTgwNjgzMTYsImV4cCI6MjA3MzY0NDMxNn0.dFXWzHY-5BbypW5pNbHPPX0uPpyCX9836vbJYknghT4'; // Your anon/public key
 
 // Initialize Supabase client
 let supabase = null;
@@ -132,138 +132,40 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // ===== SUPABASE AUTHENTICATION =====
-        async sendSMSCode(phoneNumber) {
-            if (!isSupabaseConfigured) {
-                // Demo mode - simulate API call
-                await new Promise(resolve => setTimeout(resolve, 1500));
-                return { success: true };
+        // EMAIL AUTH
+        async function sendEmailLink(email) {
+          if (!isSupabaseConfigured) return { success: true };
+          try {
+            const { error } = await supabase.auth.signInWithOtp({ email });
+            if (error) {
+              console.error('Email link send error', error);
+              return { success: false, message: error.message };
             }
-
-            try {
-                const { error } = await supabase.auth.signInWithOtp({
-                    phone: phoneNumber.replace(/\s/g, ''), // Remove spaces
-                });
-
-                if (error) {
-                    console.error('SMS send error:', error);
-                    return { success: false, message: error.message };
-                }
-
-                return { success: true };
-            } catch (error) {
-                console.error('SMS send error:', error);
-                return { success: false, message: 'Failed to send SMS. Please try again.' };
-            }
+            return { success: true };
+          } catch (error) {
+            console.error('Email link send error', error);
+            return { success: false, message: 'Failed to send email link.' };
+          }
         }
-
-        async verifySMSCode(phoneNumber, code) {
-            if (!isSupabaseConfigured) {
-                // Demo mode - simulate API call
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                if (code === this.config.demoCode) {
-                    const user = {
-                        id: 'demo-user-' + Date.now(),
-                        phone: phoneNumber,
-                        createdAt: new Date().toISOString(),
-                        initials: this.generateInitials(phoneNumber)
-                    };
-                    
-                    this.currentUser = user;
-                    this.saveUserData();
-                    return { success: true, user };
-                } else {
-                    return { success: false, message: 'Invalid verification code. Use 123456 for demo.' };
-                }
+        
+        async function verifyEmailOTP(email, token) {
+          if (!isSupabaseConfigured) return { success: true };
+          try {
+            const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' });
+            if (error) {
+              console.error('Email verification error', error);
+              return { success: false, message: error.message };
             }
-
-            try {
-                const { data, error } = await supabase.auth.verifyOtp({
-                    phone: phoneNumber.replace(/\s/g, ''),
-                    token: code,
-                    type: 'sms'
-                });
-
-                if (error) {
-                    console.error('SMS verification error:', error);
-                    return { success: false, message: error.message };
-                }
-
-                if (data?.user) {
-                    const user = {
-                        id: data.user.id,
-                        phone: data.user.phone || phoneNumber,
-                        createdAt: data.user.created_at,
-                        initials: this.generateInitials(phoneNumber)
-                    };
-                    
-                    this.currentUser = user;
-                    await this.saveUserData();
-                    return { success: true, user };
-                }
-
-                return { success: false, message: 'Verification failed' };
-            } catch (error) {
-                console.error('SMS verification error:', error);
-                return { success: false, message: 'Verification failed. Please try again.' };
+            if (data?.user) {
+              return { success: true, user: data.user };
             }
+            return { success: false, message: 'Verification failed.' };
+          } catch (error) {
+            console.error('Email verification error', error);
+            return { success: false, message: 'Verification failed.' };
+          }
         }
-
-        async checkUserSession() {
-            if (!isSupabaseConfigured) {
-                // Demo mode - check localStorage
-                if (this.currentUser) {
-                    this.showDashboard();
-                } else {
-                    this.showLoginScreen();
-                }
-                return;
-            }
-
-            try {
-                const { data: { session } } = await supabase.auth.getSession();
-                
-                if (session?.user) {
-                    this.currentUser = {
-                        id: session.user.id,
-                        phone: session.user.phone || session.user.email || 'Unknown',
-                        createdAt: session.user.created_at,
-                        initials: this.generateInitials(session.user.phone || session.user.email)
-                    };
-                    
-                    await this.loadSavedGames();
-                    this.showDashboard();
-                } else {
-                    this.showLoginScreen();
-                }
-                
-                // Listen for auth state changes
-                supabase.auth.onAuthStateChange((event, session) => {
-                    console.log('Auth state changed:', event);
-                    
-                    if (event === 'SIGNED_IN' && session?.user) {
-                        this.currentUser = {
-                            id: session.user.id,
-                            phone: session.user.phone || session.user.email || 'Unknown',
-                            createdAt: session.user.created_at,
-                            initials: this.generateInitials(session.user.phone || session.user.email)
-                        };
-                        
-                        this.loadSavedGames().then(() => {
-                            this.showDashboard();
-                        });
-                    } else if (event === 'SIGNED_OUT') {
-                        this.currentUser = null;
-                        this.savedGames = [];
-                        this.showLoginScreen();
-                    }
-                });
-                
-            } catch (error) {
-                console.error('Session check error:', error);
-                this.showLoginScreen();
-            }
-        }
+        
 
         // ===== SUPABASE DATABASE OPERATIONS =====
         async saveGame(gameData) {
