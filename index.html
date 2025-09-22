@@ -19,94 +19,38 @@
 <body>
     <div class="app-container">
         
-        <!-- Enhanced Phone Authentication Screen -->
+        <!-- Email Authentication Screen -->
         <div id="login-screen" class="screen active">
-            <div class="auth-header">
-                <div class="app-logo">🏌️‍♂️</div>
-                <h1>Mini Golf Pro</h1>
-                <p>Professional score tracking made simple</p>
+          <div class="auth-header">
+            <div class="app-logo"></div>
+            <h1>Mini Golf Pro</h1>
+            <p>Professional score tracking made simple</p>
+          </div>
+          <div class="auth-card">
+            <h2>Welcome Back</h2>
+            <p class="auth-subtitle">Enter your email address to continue</p>
+            <form id="email-auth-form">
+              <input
+                type="email"
+                id="email-input"
+                class="form-control"
+                placeholder="Enter your email address"
+                required
+                autocomplete="email"
+              >
+              <button type="submit" class="btn btn--primary btn--full-width">
+                Send Login Link
+              </button>
+              <div class="auth-message" id="auth-message"></div>
+            </form>
+            <div class="auth-footer">
+              <p>
+                By continuing, you agree to our <a href="#">Terms of Service</a>
+              </p>
             </div>
-            
-            <div class="auth-card">
-                <h2>Welcome Back</h2>
-                <p class="auth-subtitle">Enter your phone number to continue</p>
-                
-                <div class="phone-input-group">
-                    <div class="country-selector">
-                        <select id="country-code" class="form-control country-select">
-                            <option value="+1" data-flag="🇺🇸">🇺🇸 +1</option>
-                            <option value="+44" data-flag="🇬🇧">🇬🇧 +44</option>
-                            <option value="+49" data-flag="🇩🇪">🇩🇪 +49</option>
-                            <option value="+33" data-flag="🇫🇷">🇫🇷 +33</option>
-                            <option value="+39" data-flag="🇮🇹">🇮🇹 +39</option>
-                            <option value="+34" data-flag="🇪🇸">🇪🇸 +34</option>
-                            <option value="+31" data-flag="🇳🇱">🇳🇱 +31</option>
-                            <option value="+61" data-flag="🇦🇺">🇦🇺 +61</option>
-                        </select>
-                    </div>
-                    <div class="phone-input-wrapper">
-                        <input type="tel" id="phone-input" class="form-control phone-input" 
-                               placeholder="123 456 7890" maxlength="15">
-                    </div>
-                </div>
-                
-                <button id="send-sms-btn" class="btn btn--primary btn--lg btn--full-width">
-                    <span class="btn-text">Send SMS Code</span>
-                    <div class="btn-loading hidden">
-                        <div class="loading-dots">
-                            <div></div>
-                            <div></div>
-                            <div></div>
-                        </div>
-                    </div>
-                </button>
-                
-                <div id="phone-message" class="message hidden"></div>
-                
-                <div class="auth-footer">
-                    <p>By continuing, you agree to our Terms of Service</p>
-                </div>
-            </div>
+          </div>
         </div>
 
-        <!-- Enhanced SMS Verification Screen -->
-        <div id="verification-screen" class="screen">
-            <div class="auth-header">
-                <div class="verification-icon">📱</div>
-                <h1>Verify Your Phone</h1>
-                <p id="sms-message">Enter the 6-digit code sent to your phone</p>
-            </div>
-            
-            <div class="auth-card">
-                <div class="sms-code-input">
-                    <input type="text" id="code-1" class="code-digit" maxlength="1">
-                    <input type="text" id="code-2" class="code-digit" maxlength="1">
-                    <input type="text" id="code-3" class="code-digit" maxlength="1">
-                    <input type="text" id="code-4" class="code-digit" maxlength="1">
-                    <input type="text" id="code-5" class="code-digit" maxlength="1">
-                    <input type="text" id="code-6" class="code-digit" maxlength="1">
-                </div>
-                
-                <button id="verify-sms-btn" class="btn btn--primary btn--lg btn--full-width">
-                    <span class="btn-text">Verify & Continue</span>
-                    <div class="btn-loading hidden">
-                        <div class="loading-spinner"></div>
-                    </div>
-                </button>
-                
-                <div class="resend-section">
-                    <p>Didn't receive the code?</p>
-                    <button id="resend-code-btn" class="btn btn--outline">
-                        <span id="resend-text">Resend Code</span>
-                        <span id="resend-timer" class="hidden">Resend in <span id="timer-count">30</span>s</span>
-                    </button>
-                </div>
-                
-                <button id="back-to-phone" class="btn btn--text">← Change Phone Number</button>
-                
-                <div id="sms-error" class="message hidden"></div>
-            </div>
-        </div>
 
         <!-- Enhanced Dashboard Screen -->
         <div id="dashboard-screen" class="screen">
