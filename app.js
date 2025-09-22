@@ -474,24 +474,20 @@ document.addEventListener('DOMContentLoaded', function() {
         }
 
         // ===== SCREEN MANAGEMENT =====
-        switchScreen(screenId) {
-            const screens = document.querySelectorAll('.screen');
-            screens.forEach(screen => screen.classList.remove('active'));
-            
-            const targetScreen = document.getElementById(screenId);
-            if (targetScreen) {
-                targetScreen.classList.add('active');
-            }
-        }
+           showLoginScreen() {
+      // Only show the login screen and hide all others
+      this.switchScreen('login-screen');
+      // No focus/clear logic for phone/email inputs--email is handled by browser
+    }
+    
+    switchScreen(screenId) {
+      // Hide all other .screen divs, show only screenId
+      const screens = document.querySelectorAll('.screen');
+      screens.forEach(screen => screen.classList.remove('active'));
+      const targetScreen = document.getElementById(screenId);
+      if (targetScreen) targetScreen.classList.add('active');
+    }
 
-        showLoginScreen() {
-            this.switchScreen('login-screen');
-            const phoneInput = document.getElementById('phone-input');
-            if (phoneInput) {
-                phoneInput.value = '';
-                setTimeout(() => phoneInput.focus(), 100);
-            }
-        }
 
         showDashboard() {
             this.switchScreen('dashboard-screen');
