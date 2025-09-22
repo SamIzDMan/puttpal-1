@@ -2396,7 +2396,7 @@ select.form-control {
     to { transform: rotate(360deg); }
 }
 
-/* Configuration Notice Modal */
+/* /* Configuration Notice Modal */
 .modal-body {
     padding: var(--space-20) 0;
 }
@@ -2434,7 +2434,7 @@ select.form-control {
     margin-top: var(--space-24);
     padding-top: var(--space-16);
     border-top: 1px solid var(--color-border);
-}
+} */
 
 /* Responsive Design */
 @media (max-width: 480px) {
